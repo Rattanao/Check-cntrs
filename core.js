@@ -305,6 +305,13 @@
     core = core.replace(/[\s,]+/g, " ").trim();
     return core || null;
   }
+  // SHED ที่ล็อกไว้ผูกกับปลายทางอยู่แล้ว: ถ้า CNTRS ไม่ระบุ Port Of Delivery (หรือเป็น THLCH) ดูปลายทางจากเลข SHED
+  const SHED_DELIVERY = { "0110": "THBMT", "0302": "THSCT", "0332": "THLKR" };
+  function effectiveDelivery(cc) {
+    const d = (cc.delivery || "").toUpperCase();
+    if (d === "" || d === "THLCH") return SHED_DELIVERY[cc.shedNo] || d || null;
+    return d;
+  }
   function expectedShed(delivery, hasTemp, hasDg) {
     if (hasDg) return "2826";
     if (hasTemp) return null;
@@ -367,12 +374,12 @@
       const dgOk = dgMatches(blob, cc.remarkRaw);
       const vent = ventOk(mb, tempM, tempC);
 
-      const expShed = expectedShed(cc.delivery, !!(tempM || tempC), !!(dgM || dgC));
+      const expShed = expectedShed(effectiveDelivery(cc), !!(tempM || tempC), !!(dgM || dgC));
       const shedRuleBad = !!expShed && cc.shedNo !== expShed;
       const shedEqual = shedOk;
       if (shedRuleBad) shedOk = false;
 
-      const rc = remarkCheck(cc.delivery, !!(tempM || tempC), !!(dgM || dgC), cc.remarkRaw);
+      const rc = remarkCheck(effectiveDelivery(cc), !!(tempM || tempC), !!(dgM || dgC), cc.remarkRaw);
       let remark = simplifyRemark(cc.remarkRaw, tempC, dgC);
       if (rc.ok && remark) {
         remark = remark.replace(/\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b/gi, " ").replace(/\s+/g, " ").trim() || null;
@@ -383,7 +390,7 @@
         const hint = SHED_RULES[cc.shedNo];
         notes.push(`SHED ไม่ตรง: MANIFEST=${shedM || "-"} / CNTRS=${shedC || "-"}${hint ? ` (CNTRS จัดเก็บที่ ${hint})` : ""}`);
       }
-      if (shedRuleBad) notes.push(`SHED ผิดกฎที่ล็อกไว้: ควรเป็น ${expShed} แต่ CNTRS อยู่ SHED ${cc.shedNo} (ปลายทาง ${cc.delivery || "-"})`);
+      if (shedRuleBad) notes.push(`SHED ผิดกฎที่ล็อกไว้: ควรเป็น ${expShed} แต่ CNTRS อยู่ SHED ${cc.shedNo} (ปลายทาง ${effectiveDelivery(cc) || "-"})`);
       if (!statusOk) notes.push(`STATUS ไม่ตรง: MANIFEST=${statusM || "-"} / CNTRS=${statusC || "-"}`);
       if (!tempOk) notes.push(`TEMP ไม่ตรง: MANIFEST=${tempM || "-"} / CNTRS=${tempC || "-"}`);
       if (!dgOk) notes.push(`DG ไม่ตรง: MANIFEST=${dgM || "-"} / CNTRS=${dgC || "-"}`);

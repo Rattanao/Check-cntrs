@@ -534,6 +534,18 @@ def vent_ok(mb, temp_m, temp_c):
     return (not is_reefer) or bool(mb["vent"])
 
 
+# SHED ที่ล็อกไว้ผูกกับปลายทางอยู่แล้ว: ถ้า CNTRS ไม่ระบุ Port Of Delivery (หรือเป็น THLCH)
+# ให้ดูปลายทางจากเลข SHED แทน
+SHED_DELIVERY = {"0110": "THBMT", "0302": "THSCT", "0332": "THLKR"}
+
+
+def effective_delivery(cc):
+    d = (cc.get("delivery") or "").upper()
+    if d in ("", "THLCH"):
+        return SHED_DELIVERY.get(cc["shed_no_norm"], d or None)
+    return d
+
+
 def expected_shed(delivery, has_temp, has_dg):
     """SHED ที่ล็อกไว้ตามกฎ: DG=2826 เสมอ; ปลายทาง THBMT (BMT/ส่งทางเรือ barge)=0110;
     ปลายทาง THLKR (ลาดกระบัง) สินค้าทั่วไป=0332 (ถ้ามี TEMP/DG ต้องไปทางรถบรรทุก
@@ -674,14 +686,14 @@ def main():
 
         vent_good = vent_ok(mb, temp_m, temp_c)
 
-        exp_shed = expected_shed(cc.get("delivery"), bool(temp_m or temp_c), bool(dg_m or dg_c))
+        exp_shed = expected_shed(effective_delivery(cc), bool(temp_m or temp_c), bool(dg_m or dg_c))
         shed_rule_bad = bool(exp_shed) and cc["shed_no_norm"] != exp_shed
         shed_equal = shed_ok
         if shed_rule_bad:
             shed_ok = False
 
         remark_expected, remark_actual, remark_ok = remark_check(
-            cc.get("delivery"), bool(temp_m or temp_c), bool(dg_m or dg_c), cc["remark_raw"]
+            effective_delivery(cc), bool(temp_m or temp_c), bool(dg_m or dg_c), cc["remark_raw"]
         )
         remark_display = simplify_remark(cc["remark_raw"], temp_c, dg_c)
         if remark_ok and remark_display:
@@ -890,7 +902,21 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
         ws.column_dimensions[get_column_letter(j)].width = w
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    wb.save(OUTPUT_PATH)
+    global OUTPUT_PATH
+    try:
+        wb.save(OUTPUT_PATH)
+    except PermissionError:
+        # ไฟล์เดิมเปิดค้างอยู่ใน Excel: บันทึกเป็นชื่อใหม่แทน ไม่ให้ผลหาย
+        base, ext = os.path.splitext(OUTPUT_PATH)
+        n = 2
+        while os.path.exists(f"{base}_{n}{ext}"):
+            try:
+                os.remove(f"{base}_{n}{ext}")
+                break
+            except PermissionError:
+                n += 1
+        OUTPUT_PATH = f"{base}_{n}{ext}"
+        wb.save(OUTPUT_PATH)
 
 
 if __name__ == "__main__":
