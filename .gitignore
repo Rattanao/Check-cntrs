@@ -1,0 +1,7 @@
+# ข้อมูลใบขน/ตู้จริงของลูกค้า ห้ามขึ้น GitHub
+input/*
+output/*
+!input/.gitkeep
+!output/.gitkeep
+__pycache__/
+*.pyc
