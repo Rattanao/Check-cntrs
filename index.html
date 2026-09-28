@@ -190,15 +190,19 @@ function renderFiles() {
 // ---------- ตรวจ ----------
 function run() {
   $("msg").textContent = "";
-  const manifest = {}, cntrs = {};
+  // อ่าน CNTRS ก่อน เพื่อรู้ Port Of Discharge จริงของ shipment นี้ - MANIFEST
+  // จะไม่ตัดพอร์ตนี้ทิ้งแม้จะอยู่ในลิสต์ยกเว้น (BKK/UCT) เพราะเป็นพอร์ตของ CNTRS เอง
+  const cntrs = {};
   let header = null;
   for (const f of files) {
-    if (f.kind === "MANIFEST" && f.rows) Object.assign(manifest, C.parseManifest(f.rows));
-    if (f.kind === "CNTRS") {
-      const parsed = f.rows ? C.parseCntrsRows(f.rows) : C.parseCntrsPdfLines(f.lines);
-      for (const [k, v] of Object.entries(parsed)) if (!(k in cntrs)) cntrs[k] = v;
-      if (!header) header = f.rows ? C.parseCntrsHeaderRows(f.rows) : C.parseCntrsHeaderPdfLines(f.lines);
-    }
+    if (f.kind !== "CNTRS") continue;
+    const parsed = f.rows ? C.parseCntrsRows(f.rows) : C.parseCntrsPdfLines(f.lines);
+    for (const [k, v] of Object.entries(parsed)) if (!(k in cntrs)) cntrs[k] = v;
+    if (!header) header = f.rows ? C.parseCntrsHeaderRows(f.rows) : C.parseCntrsHeaderPdfLines(f.lines);
+  }
+  const manifest = {};
+  for (const f of files) {
+    if (f.kind === "MANIFEST" && f.rows) Object.assign(manifest, C.parseManifest(f.rows, header && header.portOfDischarge));
   }
   if (!Object.keys(manifest).length || !Object.keys(cntrs).length) {
     $("msg").textContent = "อ่านตู้จากไฟล์ไม่ได้ ตรวจสอบว่าเป็นรายงาน CARGO MANIFEST และ CONTAINER LIST FOR FEEDER";

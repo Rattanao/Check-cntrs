@@ -177,7 +177,7 @@ VENT_RE = re.compile(r"(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)", re.IGN
 EXCLUDED_PORTS = ("BKK", "UCT")  # ตรวจทุก PORT ยกเว้นพอร์ตที่รหัสลงท้ายด้วยชุดนี้ (THBKK, THUCT)
 
 
-def parse_manifest(path, excluded_ports=EXCLUDED_PORTS):
+def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
     """MANIFEST.xls is a printed report exported to Excel: the merged-cell
     column boundaries drift from shipment to shipment (a container list that
     sits in column 5 in one file can land in column 6 in another, etc.), so
@@ -187,7 +187,9 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS):
 
     excluded_ports: B/L blocks printed on pages whose footer says
     'PortOfDischarge: <port>' with a port code ending in one of these (BKK,
-    UCT) are skipped; every other port is checked."""
+    UCT) are skipped; every other port is checked. keep_port: never exclude
+    this exact port even if it matches excluded_ports - it's the port this
+    shipment's own CNTRS document is actually for, so it must always be kept."""
     mdf = pd.ExcelFile(path).parse("Sheet1", header=None)
     n = len(mdf)
     ncols = mdf.shape[1]
@@ -283,7 +285,7 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS):
 
     containers_map = {}
     for b in bl_blocks:
-        if b["port"] and b["port"].endswith(tuple(excluded_ports)):
+        if b["port"] and b["port"] != keep_port and b["port"].endswith(tuple(excluded_ports)):
             continue
         for c in b["containers"]:
             containers_map[c] = b
@@ -350,8 +352,10 @@ def find_cntrs_columns(cdf, scan_rows=10):
 
 # ---------------- CNTRS PDF PARSING ----------------
 PDF_CONTAINER_LINE_RE = re.compile(
+    # STATUS กับ POL บางครั้งพิมพ์ติดกันไม่มีเว้นวรรค เช่น "9=LCL/CFSKRPUS" จึงต้อง
+    # ระบุค่า STATUS ที่เป็นไปได้ตรงๆ (ไม่ใช่ \S+ กว้างๆ) แล้วให้ \s* รับทั้งมีและไม่มีวรรค
     r"^(?P<cno>[A-Z]{4}\d{6,7})\s+(?P<item>\d+)\s+(?P<type>\S+)\s+(?P<size>\S+\s*\(\d+'\))\s+"
-    r"(?P<cons>.*?)\s+(?P<wt>[\d,]+(?:\.\d+)?)\s+KGM\s+(?P<status>\d=\S+)\s+(?P<pol>[A-Z]{5})\s*(?P<remark>.*)$")
+    r"(?P<cons>.*?)\s+(?P<wt>[\d,]+(?:\.\d+)?)\s+KGM\s+(?P<status>\d=(?:FCL|LCL/CFS))\s*(?P<pol>[A-Z]{5})\s*(?P<remark>.*)$")
 PDF_HEADER_RE = re.compile(
     r"CONTAINER LIST FOR FEEDER\s+(?P<feeder>.+?)\s+VOYAGE\s+(?P<voyage>\S+)\s+ARRIVAL DATE\s+(?P<arr>\S+)\s+"
     r"Port Of Discharge\s+(?P<pod>\w+)(?:\s+Port Of Delivery\s+(?P<pod2>\w+))?", re.IGNORECASE)
@@ -626,7 +630,7 @@ def main():
     cntrs_header = parse_cntrs_header(cntrs_files[0])
     manifest_containers = {}
     for f in manifest_files:
-        manifest_containers.update(parse_manifest(f))
+        manifest_containers.update(parse_manifest(f, keep_port=cntrs_header.get("port_of_discharge")))
 
     all_container_nos = sorted(
         set(manifest_containers) | set(cntrs_containers),

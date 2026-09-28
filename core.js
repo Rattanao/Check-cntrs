@@ -95,7 +95,7 @@
   }
 
   // ---------- MANIFEST ----------
-  function parseManifest(rows) {
+  function parseManifest(rows, keepPort) {
     const n = rows.length, ncols = ncolsOf(rows);
     const cells = idx => {
       const out = [];
@@ -142,7 +142,7 @@
       const vm = VENT_RE.exec(descAll.join(" "));
       const block = { blNo, consignee, statusRaw, shedNo, containers, temps, descAll,
                       isReefer, vent: vm ? vm[1] : null, port: portOfRow(start) };
-      if (block.port && EXCLUDED_PORTS.some(x => block.port.endsWith(x))) return;
+      if (block.port && block.port !== keepPort && EXCLUDED_PORTS.some(x => block.port.endsWith(x))) return;
       containers.forEach(c => { map[c] = block; });
     });
     return map;
@@ -235,9 +235,11 @@
   }
 
   // ---------- CNTRS (pdf text lines) ----------
+  // STATUS กับ POL บางครั้งพิมพ์ติดกันไม่มีเว้นวรรค เช่น "9=LCL/CFSKRPUS" จึงระบุค่า
+  // STATUS ที่เป็นไปได้ตรงๆ แทน \S+ กว้างๆ แล้วให้ \s* รับทั้งมีและไม่มีวรรค
   const PDF_CONTAINER_LINE_RE = new RegExp(
     "^(?<cno>[A-Z]{4}\\d{6,7})\\s+(?<item>\\d+)\\s+(?<type>\\S+)\\s+(?<size>\\S+\\s*\\(\\d+'\\))\\s+" +
-    "(?<cons>.*?)\\s+(?<wt>[\\d,]+(?:\\.\\d+)?)\\s+KGM\\s+(?<status>\\d=\\S+)\\s+(?<pol>[A-Z]{5})\\s*(?<remark>.*)$");
+    "(?<cons>.*?)\\s+(?<wt>[\\d,]+(?:\\.\\d+)?)\\s+KGM\\s+(?<status>\\d=(?:FCL|LCL\\/CFS))\\s*(?<pol>[A-Z]{5})\\s*(?<remark>.*)$");
   const PDF_HEADER_RE = new RegExp(
     "CONTAINER LIST FOR FEEDER\\s+(?<feeder>.+?)\\s+VOYAGE\\s+(?<voyage>\\S+)\\s+ARRIVAL DATE\\s+(?<arr>\\S+)\\s+" +
     "Port Of Discharge\\s+(?<pod>\\w+)(?:\\s+Port Of Delivery\\s+(?<pod2>\\w+))?", "i");
