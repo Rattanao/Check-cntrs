@@ -341,6 +341,14 @@
     const isReefer = mb.isReefer || !!tempM || !!tempC;
     return !isReefer || !!mb.vent;
   }
+  const TRANSIT_DEST_RE = /\bTO\s+[A-Z]{3,}/i;
+  function transitOk(remarkRaw) {
+    // REMARK ที่บอกปลายทางต่างประเทศ (เช่น "TO LAOS") คือสินค้า TRANSIT ผ่านไทย
+    // ต้องมีคำว่า TRANSIT ระบุไว้ด้วยเสมอ (เช่น "TRANSIT TO LAOS")
+    if (!remarkRaw) return true;
+    const r = remarkRaw.toUpperCase();
+    return !(TRANSIT_DEST_RE.test(r) && !r.includes("TRANSIT"));
+  }
 
   // ---------- build report rows ----------
   function buildReport(manifest, cntrs) {
@@ -350,11 +358,14 @@
     for (const cno of order) {
       const mb = manifest[cno], cc = cntrs[cno];
       if (!mb) {
+        const tC0 = extractCntrsTemp(cc.remarkRaw), dC0 = extractDg(cc.remarkRaw);
+        let note0 = "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST";
+        if (!transitOk(cc.remarkRaw)) note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)";
         rows.push({ critical: true, item: cc.item, cno, blNo: "-", consignee: cc.consignee || "-",
           shedM: "-", shedC: cc.shedNo, shedOk: false, statusM: "-", statusC: normStatus(cc.statusRaw), statusOk: false,
-          tempM: "-", tempC: extractCntrsTemp(cc.remarkRaw), tempOk: false,
-          dgM: "-", dgC: extractDg(cc.remarkRaw), dgOk: false, ventOk: true,
-          remark: cc.remarkRaw, remarkOk: false, note: "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST" });
+          tempM: "-", tempC: tC0, tempOk: false,
+          dgM: "-", dgC: dC0, dgOk: false, ventOk: true,
+          remark: simplifyRemark(cc.remarkRaw, tC0, dC0), remarkOk: false, note: note0 });
         mismatch++; continue;
       }
       if (!cc) {
@@ -382,6 +393,8 @@
       if (shedRuleBad) shedOk = false;
 
       const rc = remarkCheck(effectiveDelivery(cc), !!(tempM || tempC), !!(dgM || dgC), cc.remarkRaw);
+      const transitGood = transitOk(cc.remarkRaw);
+      if (!transitGood && rc.ok !== false) rc.ok = false;
       let remark = simplifyRemark(cc.remarkRaw, tempC, dgC);
       if (rc.ok && remark) {
         remark = remark.replace(/\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b/gi, " ").replace(/\s+/g, " ").trim() || null;
@@ -397,7 +410,8 @@
       if (!tempOk) notes.push(`TEMP ไม่ตรง: MANIFEST=${tempM || "-"} / CNTRS=${tempC || "-"}`);
       if (!dgOk) notes.push(`DG ไม่ตรง: MANIFEST=${dgM || "-"} / CNTRS=${dgC || "-"}`);
       if (!vent) notes.push("VENT ไม่ระบุใน MANIFEST");
-      if (rc.ok === false) notes.push(`REMARK ไม่ตรงกฎ: ควรเป็น '${rc.expected}' แต่พบ '${rc.actual}'`);
+      if (rc.ok === false && rc.expected) notes.push(`REMARK ไม่ตรงกฎ: ควรเป็น '${rc.expected}' แต่พบ '${rc.actual}'`);
+      if (!transitGood) notes.push("REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)");
 
       const bad = !(shedOk && statusOk && tempOk && dgOk && vent && rc.ok !== false);
       if (bad) mismatch++;

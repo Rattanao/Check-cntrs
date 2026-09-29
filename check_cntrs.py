@@ -567,6 +567,19 @@ def expected_shed(delivery, has_temp, has_dg):
     return None
 
 
+TRANSIT_DEST_RE = re.compile(r"\bTO\s+[A-Z]{3,}", re.IGNORECASE)
+
+
+def transit_ok(remark_raw):
+    """REMARK ที่บอกปลายทางต่างประเทศ (เช่น 'TO LAOS') คือสินค้า TRANSIT ผ่านไทย
+    ต้องมีคำว่า TRANSIT ระบุไว้ด้วยเสมอ (เช่น 'TRANSIT TO LAOS') ถ้ามีแค่ 'TO LAOS'
+    เฉยๆ โดยไม่มีคำว่า TRANSIT ถือว่าไม่ครบและต้องแจ้งเตือน"""
+    if not remark_raw:
+        return True
+    r = remark_raw.upper()
+    return not (TRANSIT_DEST_RE.search(r) and "TRANSIT" not in r)
+
+
 def remark_check(delivery, temp_present, dg_present, remark_raw):
     """REMARK ต้องบอกวิธีขนส่งตาม Port Of Delivery:
     BMT (THBMT) = BY BARGE ; SCT = BY TRUCK ;
@@ -645,16 +658,23 @@ def main():
         cc = cntrs_containers.get(cno)
 
         if mb is None:
+            temp_c0 = extract_cntrs_temp(cc["remark_raw"])
+            dg_c0 = extract_dg(cc["remark_raw"])
+            note0 = "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST"
+            if not transit_ok(cc["remark_raw"]):
+                note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)"
             rows.append({
                 "critical": True,
                 "item": cc["item"], "container_no": cno, "bl_no": "-", "consignee": cc["consignee"] or "-",
                 "shed_m": "-", "shed_c": cc["shed_no"], "shed_ok": False,
                 "status_m": "-", "status_c": norm_status(cc["status_raw"]), "status_ok": False,
-                "temp_m": "-", "temp_c": extract_cntrs_temp(cc["remark_raw"]), "temp_ok": False,
-                "dg_m": "-", "dg_c": extract_dg(cc["remark_raw"]), "dg_ok": False,
+                "temp_m": "-", "temp_c": temp_c0, "temp_ok": False,
+                "dg_m": "-", "dg_c": dg_c0, "dg_ok": False,
                 "vent_ok": True,
-                "remark_raw": cc["remark_raw"], "remark_expected": "-", "remark_ok": False,
-                "note": "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST",
+                # ตัด HI-CUBE/REEFER/HAZARDOUS ที่ซ้ำกับ TEMP/DG ออกเหมือนแถวปกติ
+                "remark_raw": simplify_remark(cc["remark_raw"], temp_c0, dg_c0),
+                "remark_expected": "-", "remark_ok": False,
+                "note": note0,
             })
             mismatch_count += 1
             continue
@@ -699,6 +719,9 @@ def main():
         remark_expected, remark_actual, remark_ok = remark_check(
             effective_delivery(cc), bool(temp_m or temp_c), bool(dg_m or dg_c), cc["remark_raw"]
         )
+        transit_good = transit_ok(cc["remark_raw"])
+        if not transit_good and remark_ok is not False:
+            remark_ok = False
         remark_display = simplify_remark(cc["remark_raw"], temp_c, dg_c)
         if remark_ok and remark_display:
             # วิธีขนส่งถูกต้องตามกฎแล้ว ไม่ต้องโชว์ซ้ำ ตัด BY BARGE/TRUCK/TRAIN ออก
@@ -721,8 +744,10 @@ def main():
             notes.append(f"DG ไม่ตรง: MANIFEST={dg_m or '-'} / CNTRS={dg_c or '-'}")
         if not vent_good:
             notes.append("VENT ไม่ระบุใน MANIFEST")
-        if remark_ok is False:
+        if remark_ok is False and remark_expected:
             notes.append(f"REMARK ไม่ตรงกฎ: ควรเป็น '{remark_expected}' แต่พบ '{remark_actual}'")
+        if not transit_good:
+            notes.append("REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)")
 
         row_mismatch = not (shed_ok and status_ok and temp_ok and dg_ok and vent_good
                             and (remark_ok is not False))
