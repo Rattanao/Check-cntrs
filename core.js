@@ -342,6 +342,7 @@
     return !isReefer || !!mb.vent;
   }
   const TRANSIT_DEST_RE = /\bTO\s+[A-Z]{3,}/i;
+  const TRANSIT_TO_PHRASE_RE = /\bTRANSIT\s+TO\s+[A-Z]+/gi;
   function transitOk(remarkRaw) {
     // REMARK ที่บอกปลายทางต่างประเทศ (เช่น "TO LAOS") คือสินค้า TRANSIT ผ่านไทย
     // ต้องมีคำว่า TRANSIT ระบุไว้ด้วยเสมอ (เช่น "TRANSIT TO LAOS")
@@ -359,13 +360,16 @@
       const mb = manifest[cno], cc = cntrs[cno];
       if (!mb) {
         const tC0 = extractCntrsTemp(cc.remarkRaw), dC0 = extractDg(cc.remarkRaw);
+        const transitGood0 = transitOk(cc.remarkRaw);
         let note0 = "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST";
-        if (!transitOk(cc.remarkRaw)) note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)";
+        if (!transitGood0) note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)";
+        let remark0 = simplifyRemark(cc.remarkRaw, tC0, dC0);
+        if (transitGood0 && remark0) remark0 = remark0.replace(TRANSIT_TO_PHRASE_RE, " ").replace(/\s+/g, " ").trim() || null;
         rows.push({ critical: true, item: cc.item, cno, blNo: "-", consignee: cc.consignee || "-",
           shedM: "-", shedC: cc.shedNo, shedOk: false, statusM: "-", statusC: normStatus(cc.statusRaw), statusOk: false,
           tempM: "-", tempC: tC0, tempOk: false,
           dgM: "-", dgC: dC0, dgOk: false, ventOk: true,
-          remark: simplifyRemark(cc.remarkRaw, tC0, dC0), remarkOk: false, note: note0 });
+          remark: remark0, remarkOk: false, note: note0 });
         mismatch++; continue;
       }
       if (!cc) {
@@ -396,8 +400,10 @@
       const transitGood = transitOk(cc.remarkRaw);
       if (!transitGood && rc.ok !== false) rc.ok = false;
       let remark = simplifyRemark(cc.remarkRaw, tempC, dgC);
-      if (rc.ok && remark) {
-        remark = remark.replace(/\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b/gi, " ").replace(/\s+/g, " ").trim() || null;
+      if (remark) {
+        if (rc.ok) remark = remark.replace(/\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b/gi, " ");
+        if (transitGood) remark = remark.replace(TRANSIT_TO_PHRASE_RE, " ");
+        remark = remark.replace(/\s+/g, " ").trim() || null;
       }
 
       const notes = [];

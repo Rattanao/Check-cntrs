@@ -568,6 +568,7 @@ def expected_shed(delivery, has_temp, has_dg):
 
 
 TRANSIT_DEST_RE = re.compile(r"\bTO\s+[A-Z]{3,}", re.IGNORECASE)
+TRANSIT_TO_PHRASE_RE = re.compile(r"\bTRANSIT\s+TO\s+[A-Z]+", re.IGNORECASE)
 
 
 def transit_ok(remark_raw):
@@ -660,9 +661,13 @@ def main():
         if mb is None:
             temp_c0 = extract_cntrs_temp(cc["remark_raw"])
             dg_c0 = extract_dg(cc["remark_raw"])
+            transit_good0 = transit_ok(cc["remark_raw"])
             note0 = "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST"
-            if not transit_ok(cc["remark_raw"]):
+            if not transit_good0:
                 note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)"
+            remark_disp0 = simplify_remark(cc["remark_raw"], temp_c0, dg_c0)
+            if transit_good0 and remark_disp0:
+                remark_disp0 = re.sub(r"\s+", " ", TRANSIT_TO_PHRASE_RE.sub(" ", remark_disp0)).strip() or None
             rows.append({
                 "critical": True,
                 "item": cc["item"], "container_no": cno, "bl_no": "-", "consignee": cc["consignee"] or "-",
@@ -672,7 +677,7 @@ def main():
                 "dg_m": "-", "dg_c": dg_c0, "dg_ok": False,
                 "vent_ok": True,
                 # ตัด HI-CUBE/REEFER/HAZARDOUS ที่ซ้ำกับ TEMP/DG ออกเหมือนแถวปกติ
-                "remark_raw": simplify_remark(cc["remark_raw"], temp_c0, dg_c0),
+                "remark_raw": remark_disp0,
                 "remark_expected": "-", "remark_ok": False,
                 "note": note0,
             })
@@ -723,9 +728,13 @@ def main():
         if not transit_good and remark_ok is not False:
             remark_ok = False
         remark_display = simplify_remark(cc["remark_raw"], temp_c, dg_c)
-        if remark_ok and remark_display:
-            # วิธีขนส่งถูกต้องตามกฎแล้ว ไม่ต้องโชว์ซ้ำ ตัด BY BARGE/TRUCK/TRAIN ออก
-            remark_display = re.sub(r"\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b", " ", remark_display, flags=re.IGNORECASE)
+        if remark_display:
+            if remark_ok:
+                # วิธีขนส่งถูกต้องตามกฎแล้ว ไม่ต้องโชว์ซ้ำ ตัด BY BARGE/TRUCK/TRAIN ออก
+                remark_display = re.sub(r"\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b", " ", remark_display, flags=re.IGNORECASE)
+            if transit_good:
+                # ระบุ TRANSIT ถูกต้องแล้ว ไม่ต้องโชว์ซ้ำ ตัด "TRANSIT TO <ปลายทาง>" ออก
+                remark_display = TRANSIT_TO_PHRASE_RE.sub(" ", remark_display)
             remark_display = re.sub(r"\s+", " ", remark_display).strip() or None
 
         notes = []
