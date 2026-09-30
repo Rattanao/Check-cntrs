@@ -24,6 +24,13 @@
   const REEFER_TYPE_RE = /^\d{2}R\d/;
   const VENT_RE = /(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)/i;
   const CARGO_MOVEMENT_RE = /CARGO\s+MOVEMENT\s*\(([^)]*)\)/i;
+  const TRANSIT_DEST_CAPTURE_RE = /\bTO\s+([A-Z]{3,})/i;
+  function transitDestination(text) {
+    // ดึงชื่อปลายทาง (เช่น LAOS, MYANMAR) จากข้อความ "TO <ปลายทาง>" ใน CARGO MOVEMENT
+    if (!text) return null;
+    const m = TRANSIT_DEST_CAPTURE_RE.exec(text.toUpperCase());
+    return m ? m[1] : null;
+  }
 
   const cellOf = (rows, i, c) => {
     const r = rows[i];
@@ -466,7 +473,7 @@
 
   root.CheckCntrs = {
     HEADERS, classifyRows, classifyText, parseManifest, parseCntrsRows, parseCntrsHeaderRows,
-    parseCntrsPdfLines, parseCntrsHeaderPdfLines, buildReport, displayCells,
+    parseCntrsPdfLines, parseCntrsHeaderPdfLines, buildReport, displayCells, transitDestination,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.CheckCntrs;
 })(typeof window !== "undefined" ? window : globalThis);

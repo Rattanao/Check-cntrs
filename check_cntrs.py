@@ -176,6 +176,17 @@ PAGE_PORT_RE = re.compile(r"PortOfDischarge:\s*([A-Z]{5})")
 REEFER_TYPE_RE = re.compile(r"^\d{2}R\d")
 VENT_RE = re.compile(r"(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)", re.IGNORECASE)
 CARGO_MOVEMENT_RE = re.compile(r"CARGO\s+MOVEMENT\s*\(([^)]*)\)", re.IGNORECASE)
+TRANSIT_DEST_CAPTURE_RE = re.compile(r"\bTO\s+([A-Z]{3,})", re.IGNORECASE)
+
+
+def transit_destination(text):
+    """ดึงชื่อปลายทาง (เช่น LAOS, MYANMAR, CAMBODIA) จากข้อความ 'TO <ปลายทาง>'
+    ใช้กับ CARGO MOVEMENT ของ B/L ที่เป็น TRANSIT เพื่อโน้ตปลายทางจริงที่เจอ
+    ไม่ใช่ข้อความตายตัว"""
+    if not text:
+        return None
+    m = TRANSIT_DEST_CAPTURE_RE.search(text.upper())
+    return m.group(1) if m else None
 
 
 EXCLUDED_PORTS = ("BKK", "UCT")  # ตรวจทุก PORT ยกเว้นพอร์ตที่รหัสลงท้ายด้วยชุดนี้ (THBKK, THUCT)
@@ -926,7 +937,8 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
             bl_cell = ws.cell(row=r, column=4)
             bl_cell.fill = PatternFill("solid", fgColor="FFA500")
             bl_cell.font = Font(bold=True, color="FFFFFF")
-            note_text = "TRANSIT/TRANSHIPMENT"
+            dest = transit_destination(row.get("cargo_movement"))
+            note_text = f"TRANSIT TO {dest}" if dest else "TRANSIT/TRANSHIPMENT"
             if row.get("cargo_movement"):
                 note_text += f"\nCARGO MOVEMENT: {row['cargo_movement']}"
             bl_cell.comment = Comment(note_text, "CNTRS_EDI")
