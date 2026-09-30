@@ -914,11 +914,13 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
         note_cell = ws.cell(row=r, column=21, value=row["note"])
         note_cell.font = Font(bold=True, color="FF0000")  # หมายเหตุ/NOTE ตัวอักษรแดง
 
-        if row["critical"] or row.get("is_transit"):
-            # เหลืองทุกครั้งสำหรับ B/L ที่เป็น TRANSIT/TRANSHIPMENT (CARGO MOVEMENT
-            # ใน MANIFEST มีคำว่า TRANSIT/TRANSHIP) เหมือนแถว critical ที่ตู้หายไป
+        if row["critical"]:
             for c in range(1, LAST_COL + 1):
                 ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor="FFE699")
+        elif row.get("is_transit"):
+            # เหลืองเฉพาะช่อง B/L NO. สำหรับ B/L ที่เป็น TRANSIT/TRANSHIPMENT
+            # (CARGO MOVEMENT ใน MANIFEST มีคำว่า TRANSIT/TRANSHIP)
+            ws.cell(row=r, column=4).fill = PatternFill("solid", fgColor="FFE699")
 
         for c in range(1, LAST_COL + 1):
             cell = ws.cell(row=r, column=c)
