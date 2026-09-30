@@ -92,21 +92,23 @@ TEMP_AFTER_KEYWORD_RE = re.compile(r"TEMP\w*\s*:?\s*([+-]?\d+)", re.IGNORECASE)
 
 def extract_manifest_temp(temps_list):
     """ดึงตัวเลขอุณหภูมิ - ต้องหาตัวเลขที่อยู่ "หลังคำว่า TEMP" ก่อนเสมอ เพราะบาง
-    เซลล์มีตัวเลขอื่นปนอยู่ก่อนหน้า (เช่น "HS CODE:080830TEMP:+1'C" ไม่งั้นจะไป
-    หยิบเลข HS CODE 080830 มาใส่แทนอุณหภูมิจริง +1). ถ้าไม่เจอคำว่า TEMP เลย (เช่น
-    ประโยคที่ใช้คำว่า DEGREES/CELSIUS แทน) ค่อย fallback ไปหาตัวเลขตัวแรกในข้อความ"""
+    เซลล์มีตัวเลขอื่นปนอยู่ก่อนหน้า (เช่น "HS CODE:080830TEMP:+1'C" หรือ
+    "GS100-200 TEMP. ATMINUS 18 DEGREES CELCIUS" ไม่งั้นจะไปหยิบเลข 080830/100
+    มาใส่แทนอุณหภูมิจริง). ตัดข้อความก่อนคำว่า TEMP ทิ้งก่อนค้นหาตัวเลขเสมอ (ถ้าไม่
+    เจอคำว่า TEMP เลย เช่น ประโยคที่ใช้คำว่า DEGREES/CELSIUS แทน ค่อยค้นทั้งข้อความ)
+    แล้วดูคำว่า MINUS ระหว่าง TEMP กับตัวเลขนั้น (รวมแบบติดกัน "ATMINUS") แทนเครื่องหมาย "-" """
     text = " ".join(temps_list).strip()
     if not text:
         return None
-    m = TEMP_AFTER_KEYWORD_RE.search(text)
-    if not m:
-        m = NUM_RE.search(text)
+    idx = text.upper().find("TEMP")
+    search_text = text[idx:] if idx != -1 else text
+    m = TEMP_AFTER_KEYWORD_RE.search(search_text) or NUM_RE.search(search_text)
     if not m:
         return None
     val = m.group(1)
     if not val.startswith(("+", "-")):
-        # ข้อความบางแบบเขียนว่า "MINUS 18 DEGREES" แทนเครื่องหมาย "-"
-        val = ("-" if re.search(r"\bMINUS\b", text.upper()) else "+") + val
+        # ข้อความบางแบบเขียนว่า "MINUS 18 DEGREES" หรือติดกัน "ATMINUS 18" แทนเครื่องหมาย "-"
+        val = ("-" if "MINUS" in search_text[: m.start()].upper() else "+") + val
     return val + "C"
 
 
@@ -262,7 +264,9 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
                 if REEFER_TYPE_RE.match(vs):
                     is_reefer_type = True  # 22R1/45R1... = ตู้เย็น
                 vsu = vs.upper()
-                if "TEMP" in vsu or "DEGREE" in vsu or "CELSIUS" in vsu:
+                # "MINUS" เก็บด้วยเพราะบางเซลล์มีแค่ตัวเลขอุณหภูมิ (เช่น "...SET AT
+                # MINUS 18") ส่วนคำว่า DEGREES CELSIUS ไปอยู่คนละเซลล์/บรรทัดถัดไป
+                if "TEMP" in vsu or "DEGREE" in vsu or "CELSIUS" in vsu or "MINUS" in vsu:
                     temps.append(vs)
                 m2 = re.search(r"SHED\s*NO\.?\s*([0-9]+)", vsu)
                 if m2:

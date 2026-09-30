@@ -50,12 +50,17 @@
     return r;
   }
   function extractManifestTemp(temps) {
+    // ตัดข้อความก่อนคำว่า TEMP ทิ้งก่อนหาตัวเลขเสมอ กันเลขอื่นที่อยู่ก่อนหน้า (เช่น
+    // "GS100-200 TEMP. ATMINUS 18...") ถูกหยิบผิดตัว แล้วเช็ค MINUS ระหว่าง TEMP
+    // กับตัวเลขนั้น (รวมแบบติดกัน "ATMINUS") แทนเครื่องหมาย "-"
     const text = temps.join(" ").trim();
     if (!text) return null;
-    let m = TEMP_AFTER_KEYWORD_RE.exec(text) || NUM_RE.exec(text);
+    const idx = text.toUpperCase().indexOf("TEMP");
+    const searchText = idx !== -1 ? text.slice(idx) : text;
+    const m = TEMP_AFTER_KEYWORD_RE.exec(searchText) || NUM_RE.exec(searchText);
     if (!m) return null;
     let val = m[1];
-    if (!/^[+-]/.test(val)) val = (/\bMINUS\b/.test(text.toUpperCase()) ? "-" : "+") + val;
+    if (!/^[+-]/.test(val)) val = (searchText.slice(0, m.index).toUpperCase().includes("MINUS") ? "-" : "+") + val;
     return val + "C";
   }
   function extractCntrsTemp(remark) {
@@ -134,7 +139,9 @@
           descAll.push(vs);
           if (REEFER_TYPE_RE.test(vs)) isReefer = true;
           const vsu = vs.toUpperCase();
-          if (vsu.includes("TEMP") || vsu.includes("DEGREE") || vsu.includes("CELSIUS")) temps.push(vs);
+          // "MINUS" เก็บด้วยเพราะบางเซลล์มีแค่ตัวเลขอุณหภูมิ (เช่น "...SET AT MINUS 18")
+          // ส่วนคำว่า DEGREES CELSIUS ไปอยู่คนละเซลล์/บรรทัดถัดไป
+          if (vsu.includes("TEMP") || vsu.includes("DEGREE") || vsu.includes("CELSIUS") || vsu.includes("MINUS")) temps.push(vs);
           const ms = /SHED\s*NO\.?\s*([0-9]+)/.exec(vsu);
           if (ms) shedNo = ms[1];
         }
