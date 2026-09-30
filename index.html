@@ -65,7 +65,7 @@
   td.vent { color: #9c0006; font-weight: 700; font-size: 11px; background: var(--red-bg) !important; text-align: center; }
   td.note { color: var(--red); font-weight: 700; white-space: normal; min-width: 260px; }
   tr.crit td { background: var(--yellow) !important; }
-  td.transit { background: var(--yellow) !important; }
+  td.transit { background: #FFA500 !important; color: #fff !important; font-weight: 700; }
   /* ล็อกคอลัมน์ NO. / ITEM / CONTAINER NO. ไว้ด้านซ้าย */
   th.s0, td.s0 { position: sticky; left: 0; z-index: 2; min-width: 46px; max-width: 46px; }
   th.s1, td.s1 { position: sticky; left: 46px; z-index: 2; min-width: 52px; max-width: 52px; }
@@ -265,7 +265,7 @@ async function download() {
       c.value = cell.v; c.border = box;
       c.alignment = { horizontal: CEN.has(j) ? "center" : "left", vertical: "middle", wrapText: j === LAST - 1 };
       if (r.critical) c.fill = fill("FFE699");
-      else if (r.isTransit && j === 3) c.fill = fill("FFE699");  // เหลืองเฉพาะช่อง B/L NO.
+      else if (r.isTransit && j === 3) { c.fill = fill("FFA500"); c.font = { bold: true, color: { argb: "FFFFFFFF" } }; }  // ส้มสดเฉพาะช่อง B/L NO.
       else if (cell.s === "ok") { c.fill = fill("C6EFCE"); c.font = { bold: true, color: { argb: "FF006100" } }; }
       else if (cell.s === "bad") { c.fill = fill("FFC7CE"); c.font = { bold: true, color: { argb: "FF9C0006" } }; }
       else if (cell.s === "na") c.fill = fill("F2F2F2");

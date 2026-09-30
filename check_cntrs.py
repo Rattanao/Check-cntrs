@@ -918,9 +918,12 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
             for c in range(1, LAST_COL + 1):
                 ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor="FFE699")
         elif row.get("is_transit"):
-            # เหลืองเฉพาะช่อง B/L NO. สำหรับ B/L ที่เป็น TRANSIT/TRANSHIPMENT
-            # (CARGO MOVEMENT ใน MANIFEST มีคำว่า TRANSIT/TRANSHIP)
-            ws.cell(row=r, column=4).fill = PatternFill("solid", fgColor="FFE699")
+            # สีส้มสดเฉพาะช่อง B/L NO. สำหรับ B/L ที่เป็น TRANSIT/TRANSHIPMENT
+            # (CARGO MOVEMENT ใน MANIFEST มีคำว่า TRANSIT/TRANSHIP) - ใช้สีต่างจาก
+            # เหลืองของแถว critical ให้ชัดว่าเป็นคนละความหมายกัน
+            bl_cell = ws.cell(row=r, column=4)
+            bl_cell.fill = PatternFill("solid", fgColor="FFA500")
+            bl_cell.font = Font(bold=True, color="FFFFFF")
 
         for c in range(1, LAST_COL + 1):
             cell = ws.cell(row=r, column=c)
