@@ -174,6 +174,7 @@ def dg_matches(manifest_text, cntrs_text):
 PAGE_PORT_RE = re.compile(r"PortOfDischarge:\s*([A-Z]{5})")
 REEFER_TYPE_RE = re.compile(r"^\d{2}R\d")
 VENT_RE = re.compile(r"(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)", re.IGNORECASE)
+CARGO_MOVEMENT_RE = re.compile(r"CARGO\s+MOVEMENT\s*\(([^)]*)\)", re.IGNORECASE)
 
 
 EXCLUDED_PORTS = ("BKK", "UCT")  # ตรวจทุก PORT ยกเว้นพอร์ตที่รหัสลงท้ายด้วยชุดนี้ (THBKK, THUCT)
@@ -273,6 +274,9 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
                     shed_no = m2.group(1)
 
         vent_m = VENT_RE.search(" ".join(desc_all))
+        cm_m = CARGO_MOVEMENT_RE.search(" ".join(desc_all))
+        cargo_movement = cm_m.group(1).strip() if cm_m else None
+        is_transit = bool(cargo_movement) and ("TRANSIT" in cargo_movement.upper() or "TRANSHIP" in cargo_movement.upper())
         bl_blocks.append({
             "bl_no": bl_no,
             "consignee": consignee,
@@ -285,6 +289,8 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
             "is_reefer_type": is_reefer_type,
             "vent": vent_m.group(1) if vent_m else None,
             "port": port_of_row(start),
+            "cargo_movement": cargo_movement,
+            "is_transit": is_transit,
         })
 
     containers_map = {}
@@ -769,6 +775,7 @@ def main():
 
         rows.append({
             "critical": False,
+            "is_transit": mb.get("is_transit", False),
             "item": cc["item"], "container_no": cno, "bl_no": mb["bl_no"],
             "consignee": cc["consignee"] or mb["consignee"],
             "shed_m": shed_m, "shed_c": shed_c, "shed_ok": shed_ok,
@@ -907,7 +914,9 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
         note_cell = ws.cell(row=r, column=21, value=row["note"])
         note_cell.font = Font(bold=True, color="FF0000")  # หมายเหตุ/NOTE ตัวอักษรแดง
 
-        if row["critical"]:
+        if row["critical"] or row.get("is_transit"):
+            # เหลืองทุกครั้งสำหรับ B/L ที่เป็น TRANSIT/TRANSHIPMENT (CARGO MOVEMENT
+            # ใน MANIFEST มีคำว่า TRANSIT/TRANSHIP) เหมือนแถว critical ที่ตู้หายไป
             for c in range(1, LAST_COL + 1):
                 ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor="FFE699")
 

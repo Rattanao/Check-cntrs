@@ -23,6 +23,7 @@
   const PAGE_PORT_RE = /PortOfDischarge:\s*([A-Z]{5})/;
   const REEFER_TYPE_RE = /^\d{2}R\d/;
   const VENT_RE = /(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)/i;
+  const CARGO_MOVEMENT_RE = /CARGO\s+MOVEMENT\s*\(([^)]*)\)/i;
 
   const cellOf = (rows, i, c) => {
     const r = rows[i];
@@ -147,8 +148,11 @@
         }
       }
       const vm = VENT_RE.exec(descAll.join(" "));
+      const cm = CARGO_MOVEMENT_RE.exec(descAll.join(" "));
+      const cargoMovement = cm ? cm[1].trim() : null;
+      const isTransit = !!cargoMovement && /TRANSIT|TRANSHIP/i.test(cargoMovement);
       const block = { blNo, consignee, statusRaw, shedNo, containers, temps, descAll,
-                      isReefer, vent: vm ? vm[1] : null, port: portOfRow(start) };
+                      isReefer, vent: vm ? vm[1] : null, port: portOfRow(start), cargoMovement, isTransit };
       if (block.port && block.port !== keepPort && EXCLUDED_PORTS.some(x => block.port.endsWith(x))) return;
       containers.forEach(c => { map[c] = block; });
     });
@@ -428,7 +432,7 @@
 
       const bad = !(shedOk && statusOk && tempOk && dgOk && vent && rc.ok !== false);
       if (bad) mismatch++;
-      rows.push({ critical: false, item: cc.item, cno, blNo: mb.blNo, consignee: cc.consignee || mb.consignee,
+      rows.push({ critical: false, isTransit: !!mb.isTransit, item: cc.item, cno, blNo: mb.blNo, consignee: cc.consignee || mb.consignee,
         shedM, shedC, shedOk, statusM, statusC, statusOk, tempM, tempC, tempOk, dgM, dgC, dgOk, ventOk: vent,
         remark, remarkOk: rc.ok, note: notes.join(" | ") });
     }
