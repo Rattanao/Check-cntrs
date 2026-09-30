@@ -418,6 +418,7 @@
       }
 
       const notes = [];
+      if (mb.isTransit) notes.push(mb.cargoMovement ? `TRANSIT/TRANSHIPMENT (CARGO MOVEMENT: ${mb.cargoMovement})` : "TRANSIT/TRANSHIPMENT");
       if (!shedEqual) {
         const hint = SHED_RULES[cc.shedNo];
         notes.push(`SHED ไม่ตรง: MANIFEST=${shedM || "-"} / CNTRS=${shedC || "-"}${hint ? ` (CNTRS จัดเก็บที่ ${hint})` : ""}`);

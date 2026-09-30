@@ -748,6 +748,9 @@ def main():
             remark_display = re.sub(r"\s+", " ", remark_display).strip() or None
 
         notes = []
+        if mb.get("is_transit"):
+            cm = mb.get("cargo_movement")
+            notes.append(f"TRANSIT/TRANSHIPMENT (CARGO MOVEMENT: {cm})" if cm else "TRANSIT/TRANSHIPMENT")
         if not shed_equal:
             hint = SHED_RULES.get(cc["shed_no_norm"])
             hint_txt = f" (CNTRS จัดเก็บที่ {hint})" if hint else ""
