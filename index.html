@@ -237,8 +237,7 @@ function drawRows() {
     .map(({ r, cells }) => `<tr class="${r.critical ? "crit" : ""}">` + cells.map((c, j) => {
         const isBl = r.isTransit && j === 3;
         const dest = isBl ? C.transitDestination(r.cargoMovement) : null;
-        const label = dest ? `TRANSIT TO ${dest}` : "TRANSIT/TRANSHIPMENT";
-        const title = isBl ? ` title="${label}${r.cargoMovement ? " - CARGO MOVEMENT: " + esc(r.cargoMovement) : ""}"` : "";
+        const title = isBl ? ` title="${esc(dest || "TRANSIT/TRANSHIPMENT")}"` : "";
         return `<td class="${[c.s || "", CENTER.has(j) ? "c" : "", j < 3 ? "s" + j : "", isBl ? "transit" : ""].join(" ").trim()}"${title}>${esc(c.v)}</td>`;
       }).join("") + "</tr>").join("");
 }
@@ -272,8 +271,7 @@ async function download() {
       if (r.critical) c.fill = fill("FFE699");
       else if (r.isTransit && j === 3) {
         c.fill = fill("FFA500"); c.font = { bold: true, color: { argb: "FFFFFFFF" } };  // ส้มสดเฉพาะช่อง B/L NO.
-        const dest = C.transitDestination(r.cargoMovement);
-        c.note = (dest ? `TRANSIT TO ${dest}` : "TRANSIT/TRANSHIPMENT") + (r.cargoMovement ? `\nCARGO MOVEMENT: ${r.cargoMovement}` : "");
+        c.note = C.transitDestination(r.cargoMovement) || "TRANSIT/TRANSHIPMENT";
       }
       else if (cell.s === "ok") { c.fill = fill("C6EFCE"); c.font = { bold: true, color: { argb: "FF006100" } }; }
       else if (cell.s === "bad") { c.fill = fill("FFC7CE"); c.font = { bold: true, color: { argb: "FF9C0006" } }; }

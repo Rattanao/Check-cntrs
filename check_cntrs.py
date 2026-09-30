@@ -938,9 +938,7 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
             bl_cell.fill = PatternFill("solid", fgColor="FFA500")
             bl_cell.font = Font(bold=True, color="FFFFFF")
             dest = transit_destination(row.get("cargo_movement"))
-            note_text = f"TRANSIT TO {dest}" if dest else "TRANSIT/TRANSHIPMENT"
-            if row.get("cargo_movement"):
-                note_text += f"\nCARGO MOVEMENT: {row['cargo_movement']}"
+            note_text = dest or "TRANSIT/TRANSHIPMENT"
             bl_cell.comment = Comment(note_text, "CNTRS_EDI")
 
         for c in range(1, LAST_COL + 1):
