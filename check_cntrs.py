@@ -13,6 +13,7 @@ import os
 import re
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.comments import Comment
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
@@ -748,9 +749,6 @@ def main():
             remark_display = re.sub(r"\s+", " ", remark_display).strip() or None
 
         notes = []
-        if mb.get("is_transit"):
-            cm = mb.get("cargo_movement")
-            notes.append(f"TRANSIT/TRANSHIPMENT (CARGO MOVEMENT: {cm})" if cm else "TRANSIT/TRANSHIPMENT")
         if not shed_equal:
             hint = SHED_RULES.get(cc["shed_no_norm"])
             hint_txt = f" (CNTRS จัดเก็บที่ {hint})" if hint else ""
@@ -779,6 +777,7 @@ def main():
         rows.append({
             "critical": False,
             "is_transit": mb.get("is_transit", False),
+            "cargo_movement": mb.get("cargo_movement"),
             "item": cc["item"], "container_no": cno, "bl_no": mb["bl_no"],
             "consignee": cc["consignee"] or mb["consignee"],
             "shed_m": shed_m, "shed_c": shed_c, "shed_ok": shed_ok,
@@ -927,6 +926,10 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
             bl_cell = ws.cell(row=r, column=4)
             bl_cell.fill = PatternFill("solid", fgColor="FFA500")
             bl_cell.font = Font(bold=True, color="FFFFFF")
+            note_text = "TRANSIT/TRANSHIPMENT"
+            if row.get("cargo_movement"):
+                note_text += f"\nCARGO MOVEMENT: {row['cargo_movement']}"
+            bl_cell.comment = Comment(note_text, "CNTRS_EDI")
 
         for c in range(1, LAST_COL + 1):
             cell = ws.cell(row=r, column=c)

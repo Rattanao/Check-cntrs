@@ -234,8 +234,11 @@ function drawRows() {
       if (only && !bad) return false;
       return !q || cells.map(c => c.v).join(" ").toLowerCase().includes(q);
     })
-    .map(({ r, cells }) => `<tr class="${r.critical ? "crit" : ""}">` + cells.map((c, j) =>
-      `<td class="${[c.s || "", CENTER.has(j) ? "c" : "", j < 3 ? "s" + j : "", (r.isTransit && j === 3) ? "transit" : ""].join(" ").trim()}">${esc(c.v)}</td>`).join("") + "</tr>").join("");
+    .map(({ r, cells }) => `<tr class="${r.critical ? "crit" : ""}">` + cells.map((c, j) => {
+        const isBl = r.isTransit && j === 3;
+        const title = isBl ? ` title="TRANSIT/TRANSHIPMENT${r.cargoMovement ? " - CARGO MOVEMENT: " + esc(r.cargoMovement) : ""}"` : "";
+        return `<td class="${[c.s || "", CENTER.has(j) ? "c" : "", j < 3 ? "s" + j : "", isBl ? "transit" : ""].join(" ").trim()}"${title}>${esc(c.v)}</td>`;
+      }).join("") + "</tr>").join("");
 }
 
 // ---------- ส่งออก Excel (หน้าตาเดียวกับ check_cntrs.py) ----------
@@ -265,7 +268,10 @@ async function download() {
       c.value = cell.v; c.border = box;
       c.alignment = { horizontal: CEN.has(j) ? "center" : "left", vertical: "middle", wrapText: j === LAST - 1 };
       if (r.critical) c.fill = fill("FFE699");
-      else if (r.isTransit && j === 3) { c.fill = fill("FFA500"); c.font = { bold: true, color: { argb: "FFFFFFFF" } }; }  // ส้มสดเฉพาะช่อง B/L NO.
+      else if (r.isTransit && j === 3) {
+        c.fill = fill("FFA500"); c.font = { bold: true, color: { argb: "FFFFFFFF" } };  // ส้มสดเฉพาะช่อง B/L NO.
+        c.note = "TRANSIT/TRANSHIPMENT" + (r.cargoMovement ? `\nCARGO MOVEMENT: ${r.cargoMovement}` : "");
+      }
       else if (cell.s === "ok") { c.fill = fill("C6EFCE"); c.font = { bold: true, color: { argb: "FF006100" } }; }
       else if (cell.s === "bad") { c.fill = fill("FFC7CE"); c.font = { bold: true, color: { argb: "FF9C0006" } }; }
       else if (cell.s === "na") c.fill = fill("F2F2F2");

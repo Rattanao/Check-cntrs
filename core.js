@@ -418,7 +418,6 @@
       }
 
       const notes = [];
-      if (mb.isTransit) notes.push(mb.cargoMovement ? `TRANSIT/TRANSHIPMENT (CARGO MOVEMENT: ${mb.cargoMovement})` : "TRANSIT/TRANSHIPMENT");
       if (!shedEqual) {
         const hint = SHED_RULES[cc.shedNo];
         notes.push(`SHED ไม่ตรง: MANIFEST=${shedM || "-"} / CNTRS=${shedC || "-"}${hint ? ` (CNTRS จัดเก็บที่ ${hint})` : ""}`);
@@ -433,7 +432,7 @@
 
       const bad = !(shedOk && statusOk && tempOk && dgOk && vent && rc.ok !== false);
       if (bad) mismatch++;
-      rows.push({ critical: false, isTransit: !!mb.isTransit, item: cc.item, cno, blNo: mb.blNo, consignee: cc.consignee || mb.consignee,
+      rows.push({ critical: false, isTransit: !!mb.isTransit, cargoMovement: mb.cargoMovement, item: cc.item, cno, blNo: mb.blNo, consignee: cc.consignee || mb.consignee,
         shedM, shedC, shedOk, statusM, statusC, statusOk, tempM, tempC, tempOk, dgM, dgC, dgOk, ventOk: vent,
         remark, remarkOk: rc.ok, note: notes.join(" | ") });
     }
