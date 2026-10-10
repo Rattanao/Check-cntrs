@@ -593,14 +593,21 @@ TRANSIT_DEST_RE = re.compile(r"\bTO\s+[A-Z]{3,}", re.IGNORECASE)
 TRANSIT_TO_PHRASE_RE = re.compile(r"\bTRANSIT\s+TO\s+[A-Z]+", re.IGNORECASE)
 
 
-def transit_ok(remark_raw):
-    """REMARK ที่บอกปลายทางต่างประเทศ (เช่น 'TO LAOS') คือสินค้า TRANSIT ผ่านไทย
-    ต้องมีคำว่า TRANSIT ระบุไว้ด้วยเสมอ (เช่น 'TRANSIT TO LAOS') ถ้ามีแค่ 'TO LAOS'
-    เฉยๆ โดยไม่มีคำว่า TRANSIT ถือว่าไม่ครบและต้องแจ้งเตือน"""
-    if not remark_raw:
-        return True
-    r = remark_raw.upper()
-    return not (TRANSIT_DEST_RE.search(r) and "TRANSIT" not in r)
+def transit_ok(remark_raw, manifest_is_transit=False):
+    """REMARK ของ CNTRS ที่พูดถึง TRANSIT ต้องมีครบทั้งคำว่า TRANSIT/TRANSHIP และ
+    ปลายทาง 'TO <ประเทศ>' เสมอ (เช่น 'TRANSIT TO MYANMAR') ถ้ามีแค่อย่างใดอย่างหนึ่ง
+    - เช่น "TRANSIT" เฉยๆ ไม่มีปลายทาง หรือ "TO LAOS" เฉยๆ ไม่มีคำว่า TRANSIT -
+    ถือว่าไม่ครบ ต้องแจ้งเตือน. ถ้า B/L นี้เป็น TRANSIT ตาม CARGO MOVEMENT ใน
+    MANIFEST อยู่แล้ว (manifest_is_transit=True) แต่ CNTRS ไม่มีข้อมูล TRANSIT
+    ระบุไว้เลย ก็ต้องแจ้งเตือนด้วยเช่นกัน (CNTRS ควรสะท้อนสถานะ TRANSIT นี้)"""
+    r = (remark_raw or "").upper()
+    has_transit_word = "TRANSIT" in r or "TRANSHIP" in r
+    has_to_dest = bool(TRANSIT_DEST_RE.search(r))
+    if manifest_is_transit:
+        return has_transit_word and has_to_dest
+    if has_to_dest and not has_transit_word:
+        return False
+    return True
 
 
 def remark_check(delivery, temp_present, dg_present, remark_raw):
@@ -686,7 +693,7 @@ def main():
             transit_good0 = transit_ok(cc["remark_raw"])
             note0 = "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST"
             if not transit_good0:
-                note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)"
+                note0 += " | REMARK ของ TRANSIT ไม่ครบ ต้องมีทั้งคำว่า TRANSIT และปลายทาง 'TO <ประเทศ>'"
             remark_disp0 = simplify_remark(cc["remark_raw"], temp_c0, dg_c0)
             if transit_good0 and remark_disp0:
                 remark_disp0 = re.sub(r"\s+", " ", TRANSIT_TO_PHRASE_RE.sub(" ", remark_disp0)).strip() or None
@@ -746,7 +753,7 @@ def main():
         remark_expected, remark_actual, remark_ok = remark_check(
             effective_delivery(cc), bool(temp_m or temp_c), bool(dg_m or dg_c), cc["remark_raw"]
         )
-        transit_good = transit_ok(cc["remark_raw"])
+        transit_good = transit_ok(cc["remark_raw"], mb.get("is_transit", False))
         if not transit_good and remark_ok is not False:
             remark_ok = False
         remark_display = simplify_remark(cc["remark_raw"], temp_c, dg_c)
@@ -778,7 +785,10 @@ def main():
         if remark_ok is False and remark_expected:
             notes.append(f"REMARK ไม่ตรงกฎ: ควรเป็น '{remark_expected}' แต่พบ '{remark_actual}'")
         if not transit_good:
-            notes.append("REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)")
+            if mb.get("is_transit") and not cc["remark_raw"]:
+                notes.append("B/L นี้เป็น TRANSIT/TRANSHIPMENT ตาม MANIFEST แต่ CNTRS ไม่มี REMARK ระบุไว้เลย")
+            else:
+                notes.append("REMARK ของ TRANSIT ไม่ครบ ต้องมีทั้งคำว่า TRANSIT และปลายทาง 'TO <ประเทศ>' (เช่น 'TRANSIT TO MYANMAR')")
 
         row_mismatch = not (shed_ok and status_ok and temp_ok and dg_ok and vent_good
                             and (remark_ok is not False))

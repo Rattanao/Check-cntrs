@@ -361,12 +361,16 @@
   }
   const TRANSIT_DEST_RE = /\bTO\s+[A-Z]{3,}/i;
   const TRANSIT_TO_PHRASE_RE = /\bTRANSIT\s+TO\s+[A-Z]+/gi;
-  function transitOk(remarkRaw) {
-    // REMARK ที่บอกปลายทางต่างประเทศ (เช่น "TO LAOS") คือสินค้า TRANSIT ผ่านไทย
-    // ต้องมีคำว่า TRANSIT ระบุไว้ด้วยเสมอ (เช่น "TRANSIT TO LAOS")
-    if (!remarkRaw) return true;
-    const r = remarkRaw.toUpperCase();
-    return !(TRANSIT_DEST_RE.test(r) && !r.includes("TRANSIT"));
+  function transitOk(remarkRaw, manifestIsTransit) {
+    // REMARK ของ CNTRS ที่พูดถึง TRANSIT ต้องมีครบทั้งคำว่า TRANSIT/TRANSHIP และ
+    // ปลายทาง "TO <ประเทศ>" เสมอ (เช่น "TRANSIT TO MYANMAR") มีแค่อย่างใดอย่างหนึ่ง
+    // ถือว่าไม่ครบ ถ้า B/L เป็น TRANSIT ตาม MANIFEST แต่ CNTRS ไม่มีข้อมูลเลยก็ไม่ครบ
+    const r = (remarkRaw || "").toUpperCase();
+    const hasTransitWord = r.includes("TRANSIT") || r.includes("TRANSHIP");
+    const hasToDest = TRANSIT_DEST_RE.test(r);
+    if (manifestIsTransit) return hasTransitWord && hasToDest;
+    if (hasToDest && !hasTransitWord) return false;
+    return true;
   }
 
   // ---------- build report rows ----------
@@ -380,7 +384,7 @@
         const tC0 = extractCntrsTemp(cc.remarkRaw), dC0 = extractDg(cc.remarkRaw);
         const transitGood0 = transitOk(cc.remarkRaw);
         let note0 = "⚠ CONTAINER นี้มีใน CNTRS แต่ไม่พบใน MANIFEST";
-        if (!transitGood0) note0 += " | REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)";
+        if (!transitGood0) note0 += " | REMARK ของ TRANSIT ไม่ครบ ต้องมีทั้งคำว่า TRANSIT และปลายทาง 'TO <ประเทศ>'";
         let remark0 = simplifyRemark(cc.remarkRaw, tC0, dC0);
         if (transitGood0 && remark0) remark0 = remark0.replace(TRANSIT_TO_PHRASE_RE, " ").replace(/\s+/g, " ").trim() || null;
         rows.push({ critical: true, item: cc.item, cno, blNo: "-", consignee: cc.consignee || "-",
@@ -415,7 +419,7 @@
       if (shedRuleBad) shedOk = false;
 
       const rc = remarkCheck(effectiveDelivery(cc), !!(tempM || tempC), !!(dgM || dgC), cc.remarkRaw);
-      const transitGood = transitOk(cc.remarkRaw);
+      const transitGood = transitOk(cc.remarkRaw, !!mb.isTransit);
       if (!transitGood && rc.ok !== false) rc.ok = false;
       let remark = simplifyRemark(cc.remarkRaw, tempC, dgC);
       if (remark) {
@@ -435,7 +439,11 @@
       if (!dgOk) notes.push(`DG ไม่ตรง: MANIFEST=${dgM || "-"} / CNTRS=${dgC || "-"}`);
       if (!vent) notes.push("VENT ไม่ระบุใน MANIFEST");
       if (rc.ok === false && rc.expected) notes.push(`REMARK ไม่ตรงกฎ: ควรเป็น '${rc.expected}' แต่พบ '${rc.actual}'`);
-      if (!transitGood) notes.push("REMARK ไม่มีคำว่า TRANSIT (พบปลายทางต่างประเทศแต่ไม่ระบุว่าเป็น TRANSIT)");
+      if (!transitGood) {
+        notes.push(mb.isTransit && !cc.remarkRaw
+          ? "B/L นี้เป็น TRANSIT/TRANSHIPMENT ตาม MANIFEST แต่ CNTRS ไม่มี REMARK ระบุไว้เลย"
+          : "REMARK ของ TRANSIT ไม่ครบ ต้องมีทั้งคำว่า TRANSIT และปลายทาง 'TO <ประเทศ>' (เช่น 'TRANSIT TO MYANMAR')");
+      }
 
       const bad = !(shedOk && statusOk && tempOk && dgOk && vent && rc.ok !== false);
       if (bad) mismatch++;
