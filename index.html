@@ -259,7 +259,7 @@ async function download() {
   const merge = (r, text, font) => { ws.mergeCells(r, 1, r, LAST); const c = ws.getCell(r, 1); c.value = text; c.font = font; };
   merge(1, "CNTRS EDI - MANIFEST vs CNTRS Discrepancy Report (SHED NUMBER / STATUS / TEMP / VENT / DG / REMARK)", { bold: true, size: 11 });
   merge(2, `FEEDER: ${header.feeder}   |   VOYAGE: ${header.voyage}   |   ARRIVAL DATE: ${header.arrivalDate}   |   PORT OF DISCHARGE: ${header.portOfDischarge}`, { bold: true, size: 11 });
-  merge(3, "กฎ SHED: DG=2826, BMT=0110, ลาดกระบัง=0332  |  กฎ REMARK ตาม Port Of Delivery: BMT=BY BARGE, SCT=BY TRUCK, LKR=BY TRUCK (ตู้เย็น/DG) นอกนั้น BY TRAIN  |  ✓ สีเขียว = ตรงกัน, ⚠ สีแดง = ไม่ตรงกัน",
+  merge(3, "กฎ SHED: DG=2826 (เฉพาะ THLCH), BMT=0110, ลาดกระบัง=0332  |  กฎ REMARK ตาม Port Of Delivery: BMT=BY BARGE, SCT=BY TRUCK, LKR=BY TRUCK (ตู้เย็น/DG) นอกนั้น BY TRAIN  |  ✓ สีเขียว = ตรงกัน, ⚠ สีแดง = ไม่ตรงกัน",
     { bold: true, size: 8, color: { argb: "FFFF0000" } });
 
   C.HEADERS.forEach((h, j) => {

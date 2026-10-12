@@ -3,7 +3,7 @@
 ตรวจจับและเปรียบเทียบข้อมูลที่ไม่ตรงกันระหว่าง MANIFEST.xls และ CNTRS.xls
 หัวข้อที่ตรวจ: SHED NUMBER, STATUS, TEMP, DG (CLASS/UN), REMARK
 
-กฎ SHED NUMBER อ้างอิง: DG=2826, SCT=0302, BMT=0110, ลาดกระบัง=0332
+กฎ SHED NUMBER อ้างอิง: DG=2826 (เฉพาะปลายทาง THLCH), SCT=0302, BMT=0110, ลาดกระบัง=0332
 กฎ REMARK (เฉพาะ SHED 0332 - ลาดกระบัง): ปกติ = BY TRAIN, ถ้ามี TEMP หรือ DG = BY TRUCK
 
 Input:  input/MANIFEST.xls, input/CNTRS.xls
@@ -573,15 +573,15 @@ def effective_delivery(cc):
 
 
 def expected_shed(delivery, has_temp, has_dg):
-    """SHED ที่ล็อกไว้ตามกฎ: DG=2826 เสมอ; ปลายทาง THBMT (BMT/ส่งทางเรือ barge)=0110;
-    ปลายทาง THLKR (ลาดกระบัง) สินค้าทั่วไป=0332 (ถ้ามี TEMP/DG ต้องไปทางรถบรรทุก
-    ไม่ผ่านโกดังลาดกระบัง จึงไม่บังคับ). คืน None = ไม่มีกฎบังคับ. (SCT=0302 ยังไม่มี
-    เกณฑ์แยกสินค้า จึงไม่บังคับ)"""
+    """SHED ที่ล็อกไว้ตามกฎ: DG=2826 เฉพาะปลายทาง THLCH เท่านั้น; ปลายทาง THBMT
+    (BMT/ส่งทางเรือ barge)=0110; ปลายทาง THLKR (ลาดกระบัง) สินค้าทั่วไป=0332
+    (ถ้ามี TEMP/DG ต้องไปทางรถบรรทุก ไม่ผ่านโกดังลาดกระบัง จึงไม่บังคับ). คืน
+    None = ไม่มีกฎบังคับ. (SCT=0302 ยังไม่มีเกณฑ์แยกสินค้า จึงไม่บังคับ)"""
+    d = (delivery or "").upper()
     if has_dg:
-        return "2826"
+        return "2826" if d == "THLCH" else None
     if has_temp:
         return None
-    d = (delivery or "").upper()
     if d == "THBMT":
         return "0110"
     if d == "THLKR":
@@ -847,7 +847,7 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
     ws["A2"].font = Font(bold=True, size=11, color="000000")
 
     ws.merge_cells(f"A3:{last_letter}3")
-    ws["A3"] = ("กฎ SHED: DG=2826, SCT=0302, BMT=0110, ลาดกระบัง=0332  |  "
+    ws["A3"] = ("กฎ SHED: DG=2826 (เฉพาะ THLCH), SCT=0302, BMT=0110, ลาดกระบัง=0332  |  "
                 "กฎ REMARK ตาม Port Of Delivery: BMT=BY BARGE, SCT=BY TRUCK, LKR=BY TRUCK (ตู้เย็น/DG) นอกนั้น BY TRAIN  |  "
                 "✓ สีเขียว = ตรงกัน, ⚠ สีแดง = ไม่ตรงกัน")
     ws["A3"].font = Font(bold=True, size=8, color="FF0000")

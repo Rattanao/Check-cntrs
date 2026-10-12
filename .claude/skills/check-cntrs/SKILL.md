@@ -17,7 +17,7 @@ description: >
    แล้วตรวจข้อมูลดิบ ไม่ใช่รายงานทันที
 
 ## กฎที่โปรแกรมใช้ (รายละเอียดใน README.md)
-- SHED เทียบตามที่เห็น + กฎล็อก DG=2826, THBMT=0110, THLKR ทั่วไป=0332
+- SHED เทียบตามที่เห็น + กฎล็อก DG=2826 (เฉพาะปลายทาง THLCH), THBMT=0110, THLKR ทั่วไป=0332
 - REMARK ตามปลายทาง: BMT=BY BARGE, SCT=BY TRUCK, LKR=BY TRUCK (ตู้เย็น/DG) นอกนั้น BY TRAIN
 - ตู้เย็น (xxRx) ต้องมี VENT ใน MANIFEST
 - ตรวจทุก PORT ยกเว้น BKK, UCT

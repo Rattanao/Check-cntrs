@@ -333,9 +333,10 @@
     return d;
   }
   function expectedShed(delivery, hasTemp, hasDg) {
-    if (hasDg) return "2826";
-    if (hasTemp) return null;
+    // DG=2826 บังคับเฉพาะปลายทาง THLCH เท่านั้น
     const d = (delivery || "").toUpperCase();
+    if (hasDg) return d === "THLCH" ? "2826" : null;
+    if (hasTemp) return null;
     if (d === "THBMT") return "0110";
     if (d === "THLKR") return "0332";
     return null;
