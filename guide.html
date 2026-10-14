@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Check CNTRS - วิธีใช้</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&family=Anuphan:wght@600;700&display=swap">
+<style>
+/* Layout: single reading column like a customs worksheet — header block, numbered procedure, colour legend as a mini CNTRS_EDI sheet, troubleshooting table */
+:root {
+  --bg: #f3f5f8;
+  --paper: #ffffff;
+  --ink: #17212e;
+  --muted: #566577;
+  --line: #d5dce5;
+  --navy: #1f4e78;
+  --navy-ink: #ffffff;
+  --accent: #1f4e78;
+  --red: #fdd7d7;   --red-ink: #8a1414;
+  --org: #ffe0b3;   --org-ink: #7a3e00;
+  --yel: #fff2cc;   --yel-ink: #6b5200;
+  --grn: #c6efce;   --grn-ink: #1d5c2b;
+  --code: #eef2f7;
+  --display: "Anuphan", "IBM Plex Sans Thai", system-ui, sans-serif;
+  --body: "IBM Plex Sans Thai", system-ui, "Leelawadee UI", "Tahoma", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f151d; --paper: #172130; --ink: #e6ecf3; --muted: #9aa9bb; --line: #2b3a4d;
+    --navy: #2d6aa3; --navy-ink: #ffffff; --accent: #7fb3e6;
+    --red: #4a1f22; --red-ink: #ffb3b3; --org: #4a2e14; --org-ink: #ffc072;
+    --yel: #443a17; --yel-ink: #ffe38a; --grn: #1d3b25; --grn-ink: #9be3ad;
+    --code: #0f1824; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f151d; --paper: #172130; --ink: #e6ecf3; --muted: #9aa9bb; --line: #2b3a4d;
+  --navy: #2d6aa3; --navy-ink: #ffffff; --accent: #7fb3e6;
+  --red: #4a1f22; --red-ink: #ffb3b3; --org: #4a2e14; --org-ink: #ffc072;
+  --yel: #443a17; --yel-ink: #ffe38a; --grn: #1d3b25; --grn-ink: #9be3ad;
+  --code: #0f1824; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.7; margin: 0; }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 20px; padding-block: 32px 56px; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--display); text-wrap: balance; line-height: 1.25; margin: 0; }
+h1 { font-size: clamp(2rem, 6vw, 2.9rem); letter-spacing: -0.01em; }
+h2 { font-size: 1.35rem; }
+p { margin: 0; }
+a { color: var(--accent); }
+a:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+code, .mono { font-family: var(--mono); font-size: 0.88em; }
+code { background: var(--code); padding: 1px 6px; border-radius: 4px; }
+
+.head { display: grid; gap: 14px; padding-block: 8px 4px; }
+.tag { font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--muted); max-width: 62ch; font-size: 1.05rem; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-family: var(--mono); font-size: 0.85rem; }
+.flow span.doc { background: var(--paper); border: 1px solid var(--line); padding: 4px 10px; border-radius: 6px; }
+.flow span.out { background: var(--navy); color: var(--navy-ink); padding: 4px 10px; border-radius: 6px; font-weight: 600; }
+.flow span.op { color: var(--muted); }
+.cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; font-weight: 500; text-decoration: none; border: 1px solid var(--navy); }
+.btn.primary { background: var(--navy); color: var(--navy-ink); }
+.btn.ghost { color: var(--accent); background: transparent; border-color: var(--line); }
+
+section.panel { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: grid; gap: 16px; min-width: 0; }
+.sub { color: var(--muted); font-size: 0.95rem; }
+
+ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: s; }
+ol.steps > li { counter-increment: s; display: grid; grid-template-columns: 2.2rem 1fr; gap: 12px; align-items: start; min-width: 0; }
+ol.steps > li::before { content: counter(s); font-family: var(--mono); font-weight: 600; width: 2.2rem; height: 2.2rem; display: grid; place-items: center; border-radius: 50%; background: var(--navy); color: var(--navy-ink); font-size: 0.95rem; }
+ol.steps li > div { min-width: 0; display: grid; gap: 4px; }
+ol.steps b { font-weight: 700; }
+.note { font-size: 0.9rem; color: var(--muted); }
+.warn { background: var(--yel); color: var(--yel-ink); border-radius: 6px; padding: 2px 8px; font-weight: 500; }
+
+.cmd { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.cmd pre { flex: 1; min-width: 0; margin: 0; background: var(--code); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: 0.85rem; line-height: 1.5; }
+.cmd button { font: inherit; font-size: 0.85rem; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+
+.split { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.split > div { min-width: 0; display: grid; gap: 8px; align-content: start; }
+.split h3 { margin: 0; font-size: 1rem; font-family: var(--display); }
+
+.sheet-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table.sheet { border-collapse: collapse; font-size: 0.8rem; width: 100%; min-width: 760px; font-variant-numeric: tabular-nums; }
+.sheet th { background: var(--navy); color: var(--navy-ink); font-weight: 600; padding: 7px 9px; text-align: center; white-space: nowrap; }
+.sheet td { padding: 7px 9px; border-top: 1px solid var(--line); white-space: nowrap; text-align: center; }
+.sheet td.l { text-align: left; }
+.r { background: var(--red); color: var(--red-ink); }
+.o { background: var(--org); color: var(--org-ink); }
+.y { background: var(--yel); color: var(--yel-ink); }
+.g { background: var(--grn); color: var(--grn-ink); }
+.caption { font-size: 0.82rem; color: var(--muted); }
+
+.legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.legend div { border-radius: 8px; padding: 10px 12px; display: grid; gap: 2px; }
+.legend b { font-size: 0.95rem; }
+.legend span { font-size: 0.85rem; }
+
+.check-list { margin: 0; padding-left: 1.2rem; display: grid; gap: 4px; }
+
+.trouble-scroll { overflow-x: auto; }
+table.trouble { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+.trouble th { text-align: left; color: var(--muted); font-weight: 500; font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.trouble td { padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.trouble td:first-child { font-family: var(--mono); font-size: 0.82rem; width: 38%; }
+
+footer { color: var(--muted); font-size: 0.85rem; display: grid; gap: 4px; }
+@media (max-width: 480px) { section.panel { padding: 18px; } .wrap { padding-inline: 16px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="head">
+    <div class="tag">เครื่องมือตรวจเอกสารขาเข้าเรือ · ใบขนสินค้าขาเข้า</div>
+    <h1>Check CNTRS</h1>
+    <p class="lede">ตรวจเทียบ MANIFEST ของสายเรือกับ CNTRS (Container List for Feeder) ให้ครบทุกตู้ แล้วออกรายงาน CNTRS_EDI.xlsx แบบใส่สี จุดไหนไม่ตรงเห็นได้ทันทีก่อนยื่นใบขน</p>
+    <div class="flow" aria-label="ขั้นตอนการทำงาน">
+      <span class="doc">MANIFEST.xls</span><span class="op">+</span>
+      <span class="doc">CNTRS.xls / .pdf</span><span class="op">→</span>
+      <span class="out">CNTRS_EDI.xlsx</span>
+    </div>
+    <div class="cta">
+      <a class="btn primary" href="index.html">ตรวจออนไลน์ (ไม่ต้องติดตั้ง)</a>
+      <a class="btn ghost" href="https://github.com/Rattanao/Check-cntrs/archive/refs/heads/main.zip">ดาวน์โหลดโปรแกรม (ZIP)</a>
+      <a class="btn ghost" href="https://github.com/Rattanao/Check-cntrs">เปิดหน้า GitHub</a>
+    </div>
+  </header>
+
+  <section class="panel" id="install">
+    <h2>ติดตั้งครั้งแรก</h2>
+    <p class="sub">ทำครั้งเดียวต่อเครื่อง ใช้ Windows (หรือจะใช้ "ตรวจออนไลน์" ด้านบนแทนก็ไม่ต้องติดตั้งอะไรเลย)</p>
+    <ol class="steps">
+      <li><div>
+        <p><b>ติดตั้ง Python 3</b> จาก <a href="https://www.python.org/downloads/">python.org/downloads</a></p>
+        <p class="note">หน้าแรกของตัวติดตั้ง <span class="warn">ติ๊ก ☑ Add python.exe to PATH</span> ก่อนกด Install Now</p>
+      </div></li>
+      <li><div>
+        <p><b>ดาวน์โหลดโปรแกรม</b> กดปุ่ม "ดาวน์โหลดโปรแกรม (ZIP)" ด้านบน</p>
+        <p class="note">คลิกขวาที่ไฟล์ ZIP → Extract All แล้วเก็บโฟลเดอร์ไว้ที่ไหนก็ได้ เช่น Documents</p>
+      </div></li>
+      <li><div>
+        <p><b>รันครั้งแรกต้องต่ออินเทอร์เน็ต</b></p>
+        <p class="note">โปรแกรมจะติดตั้งไลบรารีที่ต้องใช้ (pandas, openpyxl, xlrd, pdfplumber) ให้เองอัตโนมัติ</p>
+      </div></li>
+    </ol>
+  </section>
+
+  <section class="panel" id="use">
+    <h2>ใช้งานทุกครั้ง</h2>
+    <ol class="steps">
+      <li><div>
+        <p><b>วางไฟล์ในโฟลเดอร์ <code>input</code></b></p>
+        <p class="note">วางไฟล์ MANIFEST (.xls/.xlsx) 1 ไฟล์ และ CNTRS (.xls/.xlsx หรือ .pdf) อย่างน้อย 1 ไฟล์ — ตั้งชื่อไฟล์อะไรก็ได้ โปรแกรมแยกประเภทจากเนื้อหาในไฟล์ให้เอง ไม่ต้องขึ้นต้นด้วยชื่อเฉพาะ และวาง CNTRS ได้หลายไฟล์พร้อมกัน (เช่น แยกตามปลายทาง BMT/LCH/LKR) โปรแกรมจะรวมให้เป็นชุดเดียว</p>
+      </div></li>
+      <li><div>
+        <p><b>ดับเบิลคลิก <code>run-check-cntrs.bat</code></b></p>
+      </div></li>
+      <li><div>
+        <p><b>เปิดผลที่ <code>output\CNTRS_EDI.xlsx</code></b></p>
+        <p class="note">หน้าจอดำจะสรุปจำนวนตู้ที่ตรวจพบและไม่ตรงกันให้ด้วย ถ้าเปิด CNTRS_EDI.xlsx ค้างไว้ใน Excel โปรแกรมจะบันทึกเป็นชื่อใหม่ (เช่น CNTRS_EDI_2.xlsx) ให้เองโดยไม่ทับไฟล์เดิม</p>
+      </div></li>
+    </ol>
+  </section>
+
+  <section class="panel" id="read">
+    <h2>อ่านรายงาน CNTRS_EDI.xlsx</h2>
+    <p class="sub">หนึ่งแถวต่อหนึ่งตู้คอนเทนเนอร์ คอลัมน์ของ MANIFEST กับ CNTRS วางคู่กันทุกหัวข้อ ช่องที่ตรงกันแสดง "-" เฉยๆ ช่องที่ไม่ตรงจะโชว์ค่าจริงทั้งสองฝั่งพร้อมพื้นแดงให้เห็นทันที</p>
+    <div class="sheet-scroll">
+      <table class="sheet">
+        <thead><tr><th class="l">สรุปผลเร่งด่วน</th><th>CONTAINER NO.</th><th>B/L NO.</th><th>SHED (MANIFEST)</th><th>SHED (CNTRS)</th><th>SHED</th><th>TEMP (MANIFEST)</th><th>TEMP (CNTRS)</th><th>TEMP</th><th>REMARK (CNTRS)</th></tr></thead>
+        <tbody>
+          <tr><td class="g l">✓ ผ่าน</td><td class="mono">HALU1234567</td><td class="mono">HASLC…0001A</td><td>-</td><td>-</td><td>✓</td><td>-</td><td>-</td><td>✓</td><td>-</td></tr>
+          <tr><td class="r l">⚠ ไม่ตรง: SHED</td><td class="mono">SKHU7654321</td><td class="mono">HASLC…0002F</td><td class="mono r">2835</td><td class="mono">2826</td><td>⚠</td><td>-</td><td>-</td><td>✓</td><td>-</td></tr>
+          <tr><td class="r l">⚠ ไม่ตรง: TEMP</td><td class="mono">FSCU1112223</td><td class="mono">HASLC…0003B</td><td>-</td><td>-</td><td>✓</td><td class="mono r">-2C</td><td class="mono">-18C</td><td>⚠</td><td>REEFER -18C</td></tr>
+          <tr><td class="y l">⚠ ไม่มีใน MANIFEST</td><td class="mono y">TLLU9998887</td><td class="y">—</td><td class="y">—</td><td class="mono y">2826</td><td class="y">⚠</td><td class="y">—</td><td class="mono y">-18C</td><td class="y">⚠</td><td class="y">HAZARDOUS CLASS 9 UN3077</td></tr>
+          <tr><td class="g l">✓ ผ่าน (TRANSIT)</td><td class="mono">SKHU4445556</td><td class="mono o">HASLS…0004</td><td>-</td><td>-</td><td>✓</td><td>-</td><td>-</td><td>✓</td><td>-</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">ตัวอย่างประกอบเท่านั้น เลข B/L และเลขตู้สมมติ รายงานจริงมีคอลัมน์มากกว่านี้ (STATUS, VENT, DG CLASS/UN ฯลฯ) · แถวสุดท้าย ช่อง B/L NO. สีส้มคือ B/L ที่เป็น TRANSIT/TRANSHIPMENT คลิกขวา → Edit Note ดูปลายทางที่เจอได้ (เช่น "MYANMAR")</p>
+    <div class="legend">
+      <div class="r"><b>แดง</b><span>ไม่ตรงกัน ต้องแก้หรือยืนยันก่อนยื่น</span></div>
+      <div class="y"><b>เหลือง (ทั้งแถว)</b><span>ตู้มีอยู่ฝั่งเดียว ไม่พบใน MANIFEST หรือ CNTRS</span></div>
+      <div class="o"><b>ส้ม (ช่อง B/L NO.)</b><span>B/L เป็น TRANSIT/TRANSHIPMENT ดู Note ว่าปลายทางอะไร</span></div>
+      <div class="g"><b>เขียว</b><span>ตรงกัน แสดง "-" ไม่ต้องทำอะไร</span></div>
+    </div>
+    <div class="split">
+      <div>
+        <h3>หัวข้อที่เทียบทุกตู้</h3>
+        <ul class="check-list">
+          <li>SHED NUMBER (เทียบตรงตามที่เห็น + กฎล็อก DG=2826 เฉพาะปลายทาง THLCH, BMT=0110, ลาดกระบัง=0332)</li>
+          <li>STATUS (FCL / LCL)</li>
+          <li>TEMP ของตู้เย็น (REEFER)</li>
+          <li>VENT — ตู้เย็นต้องมีระบุใน MANIFEST เสมอ</li>
+          <li>DG CLASS / UN (เทียบเลข UN เป็นหลัก)</li>
+          <li>REMARK ตามปลายทาง: BMT=BY BARGE, SCT=BY TRUCK, LKR=BY TRUCK (ตู้เย็น/DG) นอกนั้น BY TRAIN</li>
+        </ul>
+      </div>
+      <div>
+        <h3>ขึ้นแดง/เหลืองทันทีเมื่อเจอ</h3>
+        <ul class="check-list">
+          <li>ตู้ที่มีใน CNTRS แต่หายจาก MANIFEST หรือกลับกัน (แถววิกฤต)</li>
+          <li>SHED ผิดกฎที่ล็อกไว้ตามปลายทาง</li>
+          <li>REMARK ของ TRANSIT ไม่ครบ ต้องมีทั้งคำว่า TRANSIT และ "TO &lt;ประเทศ&gt;"</li>
+          <li>TEMP ไม่ตรงกัน หรือตู้เย็นไม่มี VENT</li>
+          <li>DG CLASS/UN ไม่ตรงกัน</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="claude">
+    <h2>ใช้กับ Claude Code</h2>
+    <p class="sub">สำหรับคนที่ใช้ Claude Code อยู่แล้ว ให้ Claude ตรวจและอธิบายผลให้ ปรับกฎเพิ่มเองได้</p>
+    <div class="cmd">
+      <pre id="clone">git clone https://github.com/Rattanao/Check-cntrs.git %USERPROFILE%\.claude\skills\check-cntrs</pre>
+      <button type="button" id="copy-clone" data-target="clone">คัดลอก</button>
+    </div>
+    <p class="note">เปิด Claude Code ใหม่ ไปที่โฟลเดอร์งาน แล้วพิมพ์ เช่น "ตรวจสอบ CNTRS"</p>
+  </section>
+
+  <section class="panel" id="help">
+    <h2>ถ้าเจอปัญหา</h2>
+    <div class="trouble-scroll">
+      <table class="trouble">
+        <thead><tr><th>ข้อความ / อาการ</th><th>วิธีแก้</th></tr></thead>
+        <tbody>
+          <tr><td>ไม่พบ Python</td><td>ติดตั้ง Python ใหม่ และติ๊ก Add python.exe to PATH</td></tr>
+          <tr><td>PermissionError: [Errno 13]</td><td>ไฟล์ CNTRS_EDI.xlsx เปิดค้างอยู่ใน Excel — โปรแกรมจะบันทึกเป็นชื่อใหม่ให้เองอัตโนมัติ ไม่ต้องทำอะไรเพิ่ม หรือปิดไฟล์เดิมแล้วรันใหม่เพื่อให้ได้ชื่อเดิมกลับมา</td></tr>
+          <tr><td>ไม่พบไฟล์ MANIFEST / CNTRS</td><td>ตรวจว่าไฟล์อยู่ในโฟลเดอร์ input และนามสกุลเป็น .xls/.xlsx หรือ .pdf โปรแกรมแยกประเภทจากเนื้อหาในไฟล์ ไม่ใช้ชื่อไฟล์</td></tr>
+          <tr><td>จำนวนตู้ไม่ตรงกันเยอะผิดปกติ (เช่นเกินครึ่ง)</td><td>มักเป็นไฟล์รูปแบบใหม่ที่คอลัมน์เลื่อนตำแหน่ง ส่งไฟล์ให้ Rattana เพื่อปรับโปรแกรมรองรับ</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <p>รายงานนี้เป็นตัวช่วยตรวจ ก่อนยื่นใบขนต้องให้คนตรวจทุกช่องที่เป็นสีแดงหรือสีเหลืองเสมอ</p>
+    <p>อัปเดตโปรแกรม: ดาวน์โหลด ZIP ใหม่แล้วแตกทับโฟลเดอร์เดิม (หรือ <code>git pull</code>) · ดูโค้ดที่ <a href="https://github.com/Rattanao/Check-cntrs">github.com/Rattanao/Check-cntrs</a></p>
+  </footer>
+</div>
+
+<script>
+document.querySelectorAll('button[data-target]').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    var el = document.getElementById(btn.dataset.target);
+    var text = el.textContent;
+    var done = function () { btn.textContent = 'คัดลอกแล้ว'; setTimeout(function () { btn.textContent = 'คัดลอก'; }, 1600); };
+    var fallback = function () {
+      var r = document.createRange(); r.selectNodeContents(el);
+      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      btn.textContent = 'กด Ctrl+C';
+    };
+    try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+  });
+});
+</script>
+</body>
+</html>
