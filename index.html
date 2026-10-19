@@ -21,7 +21,8 @@
   header .wrap { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; justify-content: space-between; }
   header .title { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
   header .brand { display: flex; align-items: center; gap: 12px; }
-  header .logo { height: 34px; width: auto; display: block; }
+  header .logo-badge { background: #fff; border-radius: 6px; padding: 5px 10px; display: inline-flex; line-height: 0; flex: 0 0 auto; }
+  header .logo { height: 30px; width: auto; display: block; }
   header h1 { margin: 0; font-size: 26px; letter-spacing: 1px; }
   header p { margin: 0; opacity: .8; font-size: 15px; }
   header .credit { margin: 0; opacity: .75; font-size: 13px; text-align: right; line-height: 1.5; align-self: flex-start; }
@@ -83,7 +84,7 @@
 <body>
 <header><div class="wrap">
   <div class="title">
-    <div class="brand"><img class="logo" src="assets/hal-logo.png" alt="Heung A Line"><h1>CHECK CNTRS</h1></div>
+    <div class="brand"><span class="logo-badge"><img class="logo" src="assets/hal-logo.png" alt="Heung A Line"></span><h1>CHECK CNTRS</h1></div>
     <p>ตรวจเทียบ MANIFEST กับ CNTRS: SHED · STATUS · TEMP · VENT · DG · REMARK</p>
   </div>
   <p class="credit">Project by Ms. Rattana Mudlae<br>Position Import DOC.</p>
