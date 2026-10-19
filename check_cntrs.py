@@ -88,7 +88,11 @@ def norm_status(raw):
     return r
 
 
-TEMP_AFTER_KEYWORD_RE = re.compile(r"TEMP\w*\s*:?\s*([+-]?\d+)", re.IGNORECASE)
+TEMP_AFTER_KEYWORD_RE = re.compile(r"TEMP?\w*\s*:?\s*([+-]?\d+)", re.IGNORECASE)
+# บางเอกสารพิมพ์ย่อ "TEM:" แทน "TEMP:" (เช่น "HS:070610TEM:0'C" ที่ชิดกับ HS CODE
+# ไม่มีช่องว่าง) - ต้องไม่ไปจับคำว่า ITEM/SYSTEM/STEM ที่มี TEM เป็นส่วนหนึ่งของคำ จึง
+# กันด้วย negative lookbehind ว่าหน้า TEM(P) ต้องไม่ใช่ตัวอักษร (ตัวเลข/จุดเริ่มต้นได้)
+TEMP_KEYWORD_RE = re.compile(r"(?<![A-Za-z])TEMP?", re.IGNORECASE)
 
 
 def extract_manifest_temp(temps_list):
@@ -101,8 +105,8 @@ def extract_manifest_temp(temps_list):
     text = " ".join(temps_list).strip()
     if not text:
         return None
-    idx = text.upper().find("TEMP")
-    search_text = text[idx:] if idx != -1 else text
+    kw_m = TEMP_KEYWORD_RE.search(text)
+    search_text = text[kw_m.start():] if kw_m else text
     m = TEMP_AFTER_KEYWORD_RE.search(search_text) or NUM_RE.search(search_text)
     if not m:
         return None
@@ -279,7 +283,7 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
                 vsu = vs.upper()
                 # "MINUS" เก็บด้วยเพราะบางเซลล์มีแค่ตัวเลขอุณหภูมิ (เช่น "...SET AT
                 # MINUS 18") ส่วนคำว่า DEGREES CELSIUS ไปอยู่คนละเซลล์/บรรทัดถัดไป
-                if "TEMP" in vsu or "DEGREE" in vsu or "CELSIUS" in vsu or "MINUS" in vsu:
+                if TEMP_KEYWORD_RE.search(vs) or "DEGREE" in vsu or "CELSIUS" in vsu or "MINUS" in vsu:
                     temps.append(vs)
                 m2 = re.search(r"SHED\s*NO\.?\s*([0-9]+)", vsu)
                 if m2:

@@ -19,7 +19,11 @@
   const CLASS_RE = new RegExp(CLASS_SRC, "i");
   const UN_RE = new RegExp(UN_SRC, "i");
   const SHORTHAND_DG_RE = /(?<!\d)([0-9]{1,2}(?:\.[0-9])?)\s*\/\s*([0-9]{3,4})\s*\/\s*(I{1,3}|N\/?A)/i;
-  const TEMP_AFTER_KEYWORD_RE = /TEMP\w*\s*:?\s*([+-]?\d+)/i;
+  const TEMP_AFTER_KEYWORD_RE = /TEMP?\w*\s*:?\s*([+-]?\d+)/i;
+  // บางเอกสารพิมพ์ย่อ "TEM:" แทน "TEMP:" ติดกับ HS CODE โดยไม่มีช่องว่าง (เช่น
+  // "HS:070610TEM:0'C") - กันไม่ให้ไปจับคำว่า ITEM/SYSTEM/STEM ด้วย negative
+  // lookbehind ว่าหน้า TEM(P) ต้องไม่ใช่ตัวอักษร (ตัวเลข/จุดเริ่มต้นได้)
+  const TEMP_KEYWORD_RE = /(?<![A-Za-z])TEMP?/i;
   const PAGE_PORT_RE = /PortOfDischarge:\s*([A-Z]{5})/;
   const REEFER_TYPE_RE = /^\d{2}R\d/;
   const VENT_RE = /(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)/i;
@@ -63,8 +67,8 @@
     // กับตัวเลขนั้น (รวมแบบติดกัน "ATMINUS") แทนเครื่องหมาย "-"
     const text = temps.join(" ").trim();
     if (!text) return null;
-    const idx = text.toUpperCase().indexOf("TEMP");
-    const searchText = idx !== -1 ? text.slice(idx) : text;
+    const kwM = TEMP_KEYWORD_RE.exec(text);
+    const searchText = kwM ? text.slice(kwM.index) : text;
     const m = TEMP_AFTER_KEYWORD_RE.exec(searchText) || NUM_RE.exec(searchText);
     if (!m) return null;
     let val = m[1];
@@ -149,7 +153,7 @@
           const vsu = vs.toUpperCase();
           // "MINUS" เก็บด้วยเพราะบางเซลล์มีแค่ตัวเลขอุณหภูมิ (เช่น "...SET AT MINUS 18")
           // ส่วนคำว่า DEGREES CELSIUS ไปอยู่คนละเซลล์/บรรทัดถัดไป
-          if (vsu.includes("TEMP") || vsu.includes("DEGREE") || vsu.includes("CELSIUS") || vsu.includes("MINUS")) temps.push(vs);
+          if (TEMP_KEYWORD_RE.test(vs) || vsu.includes("DEGREE") || vsu.includes("CELSIUS") || vsu.includes("MINUS")) temps.push(vs);
           const ms = /SHED\s*NO\.?\s*([0-9]+)/.exec(vsu);
           if (ms) shedNo = ms[1];
         }
