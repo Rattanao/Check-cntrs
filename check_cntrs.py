@@ -756,6 +756,10 @@ def main():
         transit_good = transit_ok(cc["remark_raw"], mb.get("is_transit", False))
         if not transit_good and remark_ok is not False:
             remark_ok = False
+        # CNTRS REMARK เองก็บอก TRANSIT/TRANSHIPMENT ได้ ไม่ใช่แค่ CARGO MOVEMENT ใน
+        # MANIFEST เท่านั้น - ต้องให้ความสำคัญ/ไฮไลต์เหมือนกันไม่ว่าฝั่งไหนระบุไว้
+        cntrs_is_transit = bool(TRANSIT_TO_PHRASE_RE.search((cc["remark_raw"] or "").upper()))
+        row_is_transit = mb.get("is_transit", False) or cntrs_is_transit
         remark_display = simplify_remark(cc["remark_raw"], temp_c, dg_c)
         if remark_display:
             if remark_ok:
@@ -797,8 +801,9 @@ def main():
 
         rows.append({
             "critical": False,
-            "is_transit": mb.get("is_transit", False),
+            "is_transit": row_is_transit,
             "cargo_movement": mb.get("cargo_movement"),
+            "cntrs_remark_raw": cc["remark_raw"],
             "item": cc["item"], "container_no": cno, "bl_no": mb["bl_no"],
             "consignee": cc["consignee"] or mb["consignee"],
             "shed_m": shed_m, "shed_c": shed_c, "shed_ok": shed_ok,
@@ -947,7 +952,7 @@ def build_excel(rows, mismatch_count, total, cntrs_header):
             bl_cell = ws.cell(row=r, column=4)
             bl_cell.fill = PatternFill("solid", fgColor="FFA500")
             bl_cell.font = Font(bold=True, color="FFFFFF")
-            dest = transit_destination(row.get("cargo_movement"))
+            dest = transit_destination(row.get("cargo_movement")) or transit_destination(row.get("cntrs_remark_raw"))
             note_text = dest or "TRANSIT/TRANSHIPMENT"
             bl_cell.comment = Comment(note_text, "CNTRS_EDI")
 

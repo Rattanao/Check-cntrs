@@ -422,6 +422,10 @@
       const rc = remarkCheck(effectiveDelivery(cc), !!(tempM || tempC), !!(dgM || dgC), cc.remarkRaw);
       const transitGood = transitOk(cc.remarkRaw, !!mb.isTransit);
       if (!transitGood && rc.ok !== false) rc.ok = false;
+      // CNTRS REMARK เองก็บอก TRANSIT/TRANSHIPMENT ได้ ไม่ใช่แค่ CARGO MOVEMENT ใน
+      // MANIFEST เท่านั้น - ต้องให้ความสำคัญ/ไฮไลต์เหมือนกันไม่ว่าฝั่งไหนระบุไว้
+      const cntrsIsTransit = /\bTRANSIT\s+TO\s+[A-Z]+/i.test(cc.remarkRaw || "");
+      const rowIsTransit = !!mb.isTransit || cntrsIsTransit;
       let remark = simplifyRemark(cc.remarkRaw, tempC, dgC);
       if (remark) {
         if (rc.ok) remark = remark.replace(/\bBY\s+(BARGE|TRUCK|TRAIN|TRAN)\b/gi, " ");
@@ -448,7 +452,7 @@
 
       const bad = !(shedOk && statusOk && tempOk && dgOk && vent && rc.ok !== false);
       if (bad) mismatch++;
-      rows.push({ critical: false, isTransit: !!mb.isTransit, cargoMovement: mb.cargoMovement, item: cc.item, cno, blNo: mb.blNo, consignee: cc.consignee || mb.consignee,
+      rows.push({ critical: false, isTransit: rowIsTransit, cargoMovement: mb.cargoMovement, cntrsRemarkRaw: cc.remarkRaw, item: cc.item, cno, blNo: mb.blNo, consignee: cc.consignee || mb.consignee,
         shedM, shedC, shedOk, statusM, statusC, statusOk, tempM, tempC, tempOk, dgM, dgC, dgOk, ventOk: vent,
         remark, remarkOk: rc.ok, note: notes.join(" | ") });
     }
