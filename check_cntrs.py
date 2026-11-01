@@ -33,6 +33,9 @@ SHED_RULES = {
 }
 
 PKG_RE = re.compile(r"^[\d,]+\s+[A-Z/]+\s*\(")
+# เหมือน PKG_RE แต่ไม่ล็อกต้นข้อความ - ใช้หาบรรทัดหัว B/L ใน MANIFEST.pdf ที่ตัวเลข
+# แพ็กเกจอยู่กลางบรรทัด (ปนกับเลข B/L และ marks ข้างหน้า) ไม่ใช่ทั้งเซลล์แบบ Excel
+PKG_MID_RE = re.compile(r"[\d,]+\s+[A-Z/]+\s*\(")
 NUM_RE = re.compile(r"([+-]?\d+)")
 CONTAINER_RE = re.compile(r"^[A-Z]{4}\d{6,7}$")
 
@@ -88,11 +91,14 @@ def norm_status(raw):
     return r
 
 
-TEMP_AFTER_KEYWORD_RE = re.compile(r"TEMP?\w*\s*:?\s*([+-]?\d+)", re.IGNORECASE)
+TEMP_AFTER_KEYWORD_RE = re.compile(r"(?!TEM[A-Z]\d{6,7}\b)TEMP?\w*\s*:?\s*([+-]?\d+)", re.IGNORECASE)
 # บางเอกสารพิมพ์ย่อ "TEM:" แทน "TEMP:" (เช่น "HS:070610TEM:0'C" ที่ชิดกับ HS CODE
 # ไม่มีช่องว่าง) - ต้องไม่ไปจับคำว่า ITEM/SYSTEM/STEM ที่มี TEM เป็นส่วนหนึ่งของคำ จึง
 # กันด้วย negative lookbehind ว่าหน้า TEM(P) ต้องไม่ใช่ตัวอักษร (ตัวเลข/จุดเริ่มต้นได้)
-TEMP_KEYWORD_RE = re.compile(r"(?<![A-Za-z])TEMP?", re.IGNORECASE)
+# และต้องไม่ใช่เลขตู้คอนเทนเนอร์ที่ขึ้นต้นด้วย TEM (เช่น "TEMU8931915" - prefix
+# ของบริษัทให้เช่าตู้จริงๆ) ซึ่งมีรูปแบบ 4 ตัวอักษร+เลข 6-7 หลักติดกันพอดี จึงกัน
+# ด้วย negative lookahead แยกออกจากกรณี "TEMP:"/"TEM:" ที่ตามด้วย : หรือเว้นวรรค
+TEMP_KEYWORD_RE = re.compile(r"(?<![A-Za-z])(?!TEM[A-Z]\d{6,7}\b)TEMP?", re.IGNORECASE)
 
 
 def extract_manifest_temp(temps_list):
@@ -107,13 +113,20 @@ def extract_manifest_temp(temps_list):
         return None
     kw_m = TEMP_KEYWORD_RE.search(text)
     search_text = text[kw_m.start():] if kw_m else text
-    m = TEMP_AFTER_KEYWORD_RE.search(search_text) or NUM_RE.search(search_text)
+    # fallback ของ NUM_RE (ตอนไม่เจอคำว่า TEMP เลย) ต้องไม่ไปหยิบเลขท้ายเลขตู้
+    # คอนเทนเนอร์ (เช่น "TEMU8931915") มาใส่แทนอุณหภูมิ จึงตัดรูปแบบเลขตู้ออกก่อน
+    no_container = re.sub(r"[A-Z]{4}\d{6,7}", " ", search_text)
+    m = TEMP_AFTER_KEYWORD_RE.search(search_text)
+    base_text = search_text
+    if not m:
+        m = NUM_RE.search(no_container)
+        base_text = no_container
     if not m:
         return None
     val = m.group(1)
     if not val.startswith(("+", "-")):
         # ข้อความบางแบบเขียนว่า "MINUS 18 DEGREES" หรือติดกัน "ATMINUS 18" แทนเครื่องหมาย "-"
-        val = ("-" if "MINUS" in search_text[: m.start()].upper() else "+") + val
+        val = ("-" if "MINUS" in base_text[: m.start()].upper() else "+") + val
     return val + "C"
 
 
@@ -195,6 +208,122 @@ def transit_destination(text):
 
 EXCLUDED_PORTS = ("BKK", "UCT")  # ตรวจทุก PORT ยกเว้นพอร์ตที่รหัสลงท้ายด้วยชุดนี้ (THBKK, THUCT)
 
+# บรรทัดหัว/ท้ายหน้าที่พิมพ์ซ้ำทุกหน้าใน MANIFEST.pdf (ไม่ใช่ข้อมูล B/L) - ใช้กันไม่ให้
+# ถูกเข้าใจผิดว่าเป็นบรรทัดหัวของ B/L ใหม่
+MANIFEST_PDF_BOILERPLATE_PREFIXES = (
+    "VESSEL & VOYAGE", "PORT OF LOADING", "TERMINAL", "BILL OF LANDING NO.",
+    "PORT TOTAL", "TOTAL GROSSWEIGHT", "TOTAL PACK", "PORTOFDISCHARGE",
+    "CARGO MANIFEST",
+)
+
+
+def parse_manifest_pdf(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
+    """MANIFEST.pdf คือรายงานเดียวกับ MANIFEST.xls แค่ export เป็น PDF แทนตาราง
+    (ตัวระบบพิมพ์รายงานเดียวกัน) แต่ละ B/L จึงพิมพ์เป็นหลายบรรทัดต่อกันแทนที่จะเป็น
+    คนละเซลล์ และบางครั้งเลขตู้ที่ 4, 5 ของ B/L เดียวกันก็โผล่มาในบรรทัดถัดๆ ไปหลัง
+    '4) TAX ID:' ด้วยซ้ำ (เรียงไม่แน่นอน) จึงสแกนทุกบรรทัดในบล็อคของแต่ละ B/L หา
+    pattern เอา แทนที่จะอิงตำแหน่งบรรทัดตายตัว - หลักการเดียวกับ parse_manifest()
+    ฝั่ง Excel ที่สแกนทุกคอลัมน์แทนตำแหน่งคอลัมน์ตายตัว"""
+    lines = [ln.rstrip() for ln in pdf_lines(path)]
+    n = len(lines)
+
+    footers = []
+    for idx, ln in enumerate(lines):
+        m = PAGE_PORT_RE.search(ln)
+        if m:
+            footers.append((idx, m.group(1)))
+
+    def port_of_row(idx):
+        for fidx, port in footers:
+            if fidx >= idx:
+                return port
+        return None
+
+    def is_marker_line(s):
+        return (s.startswith(("S :", "C :", "N :")) or re.match(r"^\d\)", s)
+                or s.upper().startswith(MANIFEST_PDF_BOILERPLATE_PREFIXES))
+
+    header_idx = [idx for idx, ln in enumerate(lines)
+                  if ln.strip() and not is_marker_line(ln.strip()) and PKG_MID_RE.search(ln)]
+
+    bl_blocks = []
+    for hi, start in enumerate(header_idx):
+        end = header_idx[hi + 1] if hi + 1 < len(header_idx) else n
+        # บล็อคสุดท้ายของหน้าไม่ควรลากยาวข้ามไปกินบรรทัดหัวตาราง/boilerplate ของ
+        # หน้าถัดไป (ซึ่งไม่มี B/L header ของตัวเองให้ตัดที่) - ตัดที่ footer
+        # 'PortOfDischarge:' ของหน้านี้แทนถ้าใกล้กว่า
+        page_footer = next((fidx for fidx, _ in footers if fidx >= start), None)
+        if page_footer is not None and page_footer < end:
+            end = page_footer + 1
+        block_lines = [ln.strip() for ln in lines[start:end] if ln.strip()]
+        bl_no = block_lines[0].split()[0] if block_lines else ""
+
+        consignee = None
+        status_raw = None
+        shed_no = None
+        containers = []
+        temps = []
+        desc_all = []
+        is_reefer_type = False
+
+        for s in block_lines:
+            cm = re.match(r"^C\s*:\s*(.*)$", s)
+            if cm:
+                ctext = cm.group(1)
+                cut = re.search(r"\d+\.\s*[A-Z]{4}\d{6,7}", ctext)
+                name = (ctext[: cut.start()] if cut else ctext).strip()
+                name = re.sub(r"\s+\d{2}[A-Z]\d(?:X\d+)?\s*$", "", name).strip()
+                consignee = name or consignee
+
+            for cm2 in re.finditer(r"\d+\.\s*([A-Z]{4}\d{6,7})", s):
+                containers.append(cm2.group(1))
+
+            if status_raw is None:
+                sm = re.search(r"(?<![A-Za-z])(CY|LCL(?:/CFS)?|FCL)(?![A-Za-z])", s)
+                if sm:
+                    status_raw = sm.group(1)
+
+            desc_all.append(s)
+            if re.search(r"(?<!\d)\d{2}R\d", s):
+                is_reefer_type = True  # 22R1/45R1... = ตู้เย็น
+            su = s.upper()
+            # "MINUS" เก็บด้วยเพราะบางบรรทัดมีแค่ตัวเลขอุณหภูมิ (เช่น "...SET AT
+            # MINUS 18") ส่วนคำว่า DEGREES CELSIUS ไปอยู่คนละบรรทัด
+            if TEMP_KEYWORD_RE.search(s) or "DEGREE" in su or "CELSIUS" in su or "MINUS" in su:
+                temps.append(s)
+            m2 = re.search(r"SHED\s*NO\.?\s*([0-9]+)", su)
+            if m2:
+                shed_no = m2.group(1)
+
+        blob = " ".join(desc_all)
+        vent_m = VENT_RE.search(blob)
+        cm_m = CARGO_MOVEMENT_RE.search(blob)
+        cargo_movement = cm_m.group(1).strip() if cm_m else None
+        is_transit = bool(cargo_movement) and ("TRANSIT" in cargo_movement.upper() or "TRANSHIP" in cargo_movement.upper())
+        bl_blocks.append({
+            "bl_no": bl_no,
+            "consignee": consignee,
+            "status_raw": status_raw,
+            "shed_no": shed_no,
+            "shed_no_norm": norm_shed(shed_no),
+            "containers": containers,
+            "temps": temps,
+            "desc_all": desc_all,
+            "is_reefer_type": is_reefer_type,
+            "vent": vent_m.group(1) if vent_m else None,
+            "port": port_of_row(start),
+            "cargo_movement": cargo_movement,
+            "is_transit": is_transit,
+        })
+
+    containers_map = {}
+    for b in bl_blocks:
+        if b["port"] and b["port"] != keep_port and b["port"].endswith(tuple(excluded_ports)):
+            continue
+        for c in b["containers"]:
+            containers_map[c] = b
+    return containers_map
+
 
 def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
     """MANIFEST.xls is a printed report exported to Excel: the merged-cell
@@ -209,6 +338,8 @@ def parse_manifest(path, excluded_ports=EXCLUDED_PORTS, keep_port=None):
     UCT) are skipped; every other port is checked. keep_port: never exclude
     this exact port even if it matches excluded_ports - it's the port this
     shipment's own CNTRS document is actually for, so it must always be kept."""
+    if path.lower().endswith(".pdf"):
+        return parse_manifest_pdf(path, excluded_ports, keep_port)
     mdf = pd.ExcelFile(path).parse("Sheet1", header=None)
     n = len(mdf)
     ncols = mdf.shape[1]

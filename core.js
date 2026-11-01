@@ -19,11 +19,12 @@
   const CLASS_RE = new RegExp(CLASS_SRC, "i");
   const UN_RE = new RegExp(UN_SRC, "i");
   const SHORTHAND_DG_RE = /(?<!\d)([0-9]{1,2}(?:\.[0-9])?)\s*\/\s*([0-9]{3,4})\s*\/\s*(I{1,3}|N\/?A)/i;
-  const TEMP_AFTER_KEYWORD_RE = /TEMP?\w*\s*:?\s*([+-]?\d+)/i;
+  const TEMP_AFTER_KEYWORD_RE = /(?!TEM[A-Z]\d{6,7}\b)TEMP?\w*\s*:?\s*([+-]?\d+)/i;
   // บางเอกสารพิมพ์ย่อ "TEM:" แทน "TEMP:" ติดกับ HS CODE โดยไม่มีช่องว่าง (เช่น
   // "HS:070610TEM:0'C") - กันไม่ให้ไปจับคำว่า ITEM/SYSTEM/STEM ด้วย negative
-  // lookbehind ว่าหน้า TEM(P) ต้องไม่ใช่ตัวอักษร (ตัวเลข/จุดเริ่มต้นได้)
-  const TEMP_KEYWORD_RE = /(?<![A-Za-z])TEMP?/i;
+  // lookbehind ว่าหน้า TEM(P) ต้องไม่ใช่ตัวอักษร (ตัวเลข/จุดเริ่มต้นได้) และกัน
+  // เลขตู้คอนเทนเนอร์ที่ขึ้นต้นด้วย TEM (เช่น "TEMU8931915") ด้วย negative lookahead
+  const TEMP_KEYWORD_RE = /(?<![A-Za-z])(?!TEM[A-Z]\d{6,7}\b)TEMP?/i;
   const PAGE_PORT_RE = /PortOfDischarge:\s*([A-Z]{5})/;
   const REEFER_TYPE_RE = /^\d{2}R\d/;
   const VENT_RE = /(?<!PRE)(?<!E)VENT[A-Z]*\s*[:.]?\s*([A-Z0-9]\S*)/i;
@@ -69,10 +70,15 @@
     if (!text) return null;
     const kwM = TEMP_KEYWORD_RE.exec(text);
     const searchText = kwM ? text.slice(kwM.index) : text;
-    const m = TEMP_AFTER_KEYWORD_RE.exec(searchText) || NUM_RE.exec(searchText);
+    // fallback ของ NUM_RE (ตอนไม่เจอคำว่า TEMP เลย) ต้องไม่ไปหยิบเลขท้ายเลขตู้
+    // คอนเทนเนอร์ (เช่น "TEMU8931915") มาใส่แทนอุณหภูมิ จึงตัดรูปแบบเลขตู้ออกก่อน
+    const noContainer = searchText.replace(/[A-Z]{4}\d{6,7}/g, " ");
+    let m = TEMP_AFTER_KEYWORD_RE.exec(searchText);
+    let baseText = searchText;
+    if (!m) { m = NUM_RE.exec(noContainer); baseText = noContainer; }
     if (!m) return null;
     let val = m[1];
-    if (!/^[+-]/.test(val)) val = (searchText.slice(0, m.index).toUpperCase().includes("MINUS") ? "-" : "+") + val;
+    if (!/^[+-]/.test(val)) val = (baseText.slice(0, m.index).toUpperCase().includes("MINUS") ? "-" : "+") + val;
     return val + "C";
   }
   function extractCntrsTemp(remark) {
@@ -161,6 +167,86 @@
       const vm = VENT_RE.exec(descAll.join(" "));
       const cm = CARGO_MOVEMENT_RE.exec(descAll.join(" "));
       const cargoMovement = cm ? cm[1].trim() : null;
+      const isTransit = !!cargoMovement && /TRANSIT|TRANSHIP/i.test(cargoMovement);
+      const block = { blNo, consignee, statusRaw, shedNo, containers, temps, descAll,
+                      isReefer, vent: vm ? vm[1] : null, port: portOfRow(start), cargoMovement, isTransit };
+      if (block.port && block.port !== keepPort && EXCLUDED_PORTS.some(x => block.port.endsWith(x))) return;
+      containers.forEach(c => { map[c] = block; });
+    });
+    return map;
+  }
+
+  // บรรทัดหัว/ท้ายหน้าที่พิมพ์ซ้ำทุกหน้าใน MANIFEST.pdf (ไม่ใช่ข้อมูล B/L)
+  const MANIFEST_PDF_BOILERPLATE = [
+    "VESSEL & VOYAGE", "PORT OF LOADING", "TERMINAL", "BILL OF LANDING NO.",
+    "PORT TOTAL", "TOTAL GROSSWEIGHT", "TOTAL PACK", "PORTOFDISCHARGE", "CARGO MANIFEST",
+  ];
+  // เหมือน PKG_RE แต่ไม่ล็อกต้นข้อความ - ใช้หาบรรทัดหัว B/L ใน MANIFEST.pdf ที่ตัวเลข
+  // แพ็กเกจอยู่กลางบรรทัด (ปนกับเลข B/L และ marks ข้างหน้า) ไม่ใช่ทั้งเซลล์แบบ Excel
+  const PKG_MID_RE = /[\d,]+\s+[A-Z/]+\s*\(/;
+
+  // ---------- MANIFEST (pdf text lines) ----------
+  // MANIFEST.pdf คือรายงานเดียวกับ MANIFEST.xls แค่ export เป็น PDF แทนตาราง แต่ละ
+  // B/L พิมพ์เป็นหลายบรรทัดต่อกันแทนคนละเซลล์ และบางครั้งเลขตู้ตัวหลังๆ ของ B/L เดียวกัน
+  // ก็โผล่มาในบรรทัดถัดๆ ไปหลัง "4) TAX ID:" ด้วยซ้ำ (เรียงไม่แน่นอน) จึงสแกนทุกบรรทัด
+  // ในบล็อคของแต่ละ B/L หา pattern เอา เหมือนหลักการเดียวกับ parseManifest() ฝั่ง Excel
+  function parseManifestPdfLines(lines, keepPort) {
+    lines = lines.map(ln => ln.replace(/\s+$/, ""));
+    const n = lines.length;
+
+    const footers = [];
+    for (let i = 0; i < n; i++) {
+      const m = PAGE_PORT_RE.exec(lines[i]);
+      if (m) footers.push([i, m[1]]);
+    }
+    const portOfRow = idx => { for (const [f, p] of footers) if (f >= idx) return p; return null; };
+
+    const isMarkerLine = s => s.startsWith("S :") || s.startsWith("C :") || s.startsWith("N :")
+      || /^\d\)/.test(s) || MANIFEST_PDF_BOILERPLATE.some(p => s.toUpperCase().startsWith(p));
+
+    const headerIdx = [];
+    for (let i = 0; i < n; i++) {
+      const s = lines[i].trim();
+      if (s && !isMarkerLine(s) && PKG_MID_RE.test(lines[i])) headerIdx.push(i);
+    }
+
+    const map = {};
+    headerIdx.forEach((start, hi) => {
+      let end = hi + 1 < headerIdx.length ? headerIdx[hi + 1] : n;
+      // บล็อคสุดท้ายของหน้าไม่ควรลากยาวข้ามไปกินบรรทัดหัวตาราง/boilerplate ของหน้าถัดไป
+      const pageFooter = footers.find(([f]) => f >= start);
+      if (pageFooter && pageFooter[0] < end) end = pageFooter[0] + 1;
+      const blockLines = lines.slice(start, end).map(ln => ln.trim()).filter(Boolean);
+      const blNo = blockLines.length ? blockLines[0].split(/\s+/)[0] : "";
+
+      let consignee = null, statusRaw = null, shedNo = null, isReefer = false;
+      const containers = [], temps = [], descAll = [];
+      for (const s of blockLines) {
+        const cm = /^C\s*:\s*(.*)$/.exec(s);
+        if (cm) {
+          const ctext = cm[1];
+          const cut = /\d+\.\s*[A-Z]{4}\d{6,7}/.exec(ctext);
+          let name = (cut ? ctext.slice(0, cut.index) : ctext).trim();
+          name = name.replace(/\s+\d{2}[A-Z]\d(?:X\d+)?\s*$/, "").trim();
+          if (name) consignee = name;
+        }
+        for (const cm2 of s.matchAll(/\d+\.\s*([A-Z]{4}\d{6,7})/g)) containers.push(cm2[1]);
+        if (statusRaw === null) {
+          const sm = /(?<![A-Za-z])(CY|LCL(?:\/CFS)?|FCL)(?![A-Za-z])/.exec(s);
+          if (sm) statusRaw = sm[1];
+        }
+        descAll.push(s);
+        if (/(?<!\d)\d{2}R\d/.test(s)) isReefer = true;
+        const su = s.toUpperCase();
+        if (TEMP_KEYWORD_RE.test(s) || su.includes("DEGREE") || su.includes("CELSIUS") || su.includes("MINUS")) temps.push(s);
+        const m2 = /SHED\s*NO\.?\s*([0-9]+)/.exec(su);
+        if (m2) shedNo = m2[1];
+      }
+
+      const blob = descAll.join(" ");
+      const vm = VENT_RE.exec(blob);
+      const cm3 = CARGO_MOVEMENT_RE.exec(blob);
+      const cargoMovement = cm3 ? cm3[1].trim() : null;
       const isTransit = !!cargoMovement && /TRANSIT|TRANSHIP/i.test(cargoMovement);
       const block = { blNo, consignee, statusRaw, shedNo, containers, temps, descAll,
                       isReefer, vent: vm ? vm[1] : null, port: portOfRow(start), cargoMovement, isTransit };
@@ -489,7 +575,7 @@
     "DG CLASS/UN (MANIFEST)", "DG CLASS/UN (CNTRS)", "DG ✓/⚠", "REMARK (CNTRS)", "REMARK ✓/⚠", "หมายเหตุ / NOTE"];
 
   root.CheckCntrs = {
-    HEADERS, classifyRows, classifyText, parseManifest, parseCntrsRows, parseCntrsHeaderRows,
+    HEADERS, classifyRows, classifyText, parseManifest, parseManifestPdfLines, parseCntrsRows, parseCntrsHeaderRows,
     parseCntrsPdfLines, parseCntrsHeaderPdfLines, buildReport, displayCells, transitDestination,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = root.CheckCntrs;

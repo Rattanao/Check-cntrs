@@ -215,7 +215,9 @@ function run() {
   }
   const manifest = {};
   for (const f of files) {
-    if (f.kind === "MANIFEST" && f.rows) Object.assign(manifest, C.parseManifest(f.rows, header && header.portOfDischarge));
+    if (f.kind !== "MANIFEST") continue;
+    const port = header && header.portOfDischarge;
+    Object.assign(manifest, f.rows ? C.parseManifest(f.rows, port) : C.parseManifestPdfLines(f.lines, port));
   }
   if (!Object.keys(manifest).length || !Object.keys(cntrs).length) {
     $("msg").textContent = "อ่านตู้จากไฟล์ไม่ได้ ตรวจสอบว่าเป็นรายงาน CARGO MANIFEST และ CONTAINER LIST FOR FEEDER";
